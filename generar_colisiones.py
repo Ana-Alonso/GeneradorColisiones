@@ -13,6 +13,26 @@ PROFILE_FILE = "perfiles_colisiones_rpg.json"
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".web"}
 ALLOWED_SAVE_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
+SLIDER_DEFS = [
+    {"key": "modo", "label": "Modo", "min": 0, "max": 2, "basic": True},
+    {"key": "blur", "label": "Blur", "min": 1, "max": 31, "basic": True},
+    {"key": "canny_low", "label": "Canny Low", "min": 0, "max": 255, "basic": True},
+    {"key": "canny_high", "label": "Canny High", "min": 1, "max": 255, "basic": True},
+    {"key": "kernel", "label": "Kernel", "min": 1, "max": 31, "basic": True},
+    {"key": "h_min", "label": "H min", "min": 0, "max": 179, "basic": True},
+    {"key": "h_max", "label": "H max", "min": 0, "max": 179, "basic": True},
+    {"key": "s_min", "label": "S min", "min": 0, "max": 255, "basic": True},
+    {"key": "s_max", "label": "S max", "min": 0, "max": 255, "basic": True},
+    {"key": "v_min", "label": "V min", "min": 0, "max": 255, "basic": True},
+    {"key": "v_max", "label": "V max", "min": 0, "max": 255, "basic": True},
+    {"key": "min_w", "label": "Min W", "min": 0, "max": 500, "basic": True},
+    {"key": "min_h", "label": "Min H", "min": 0, "max": 500, "basic": True},
+    {"key": "max_w_pct", "label": "Max W %", "min": 1, "max": 100, "basic": False},
+    {"key": "max_h_pct", "label": "Max H %", "min": 1, "max": 100, "basic": False},
+    {"key": "base_ratio", "label": "Base %", "min": 0, "max": 100, "basic": True},
+    {"key": "x_margin_ratio", "label": "Margen X %", "min": 0, "max": 40, "basic": True},
+]
+
 # Presets iniciales para modo híbrido. Ajusta estos rangos a tu paleta real.
 HYBRID_HSV_RANGES = [
     {
@@ -190,24 +210,24 @@ def ensure_hybrid_type(ranges, tipo):
     return default
 
 
-def set_hybrid_trackbars(tipo_range):
-    cv2.setTrackbarPos("H2 min (tipo)", WINDOW_NAME, clamp(tipo_range["h_min"], 0, 179))
-    cv2.setTrackbarPos("H2 max (tipo)", WINDOW_NAME, clamp(tipo_range["h_max"], 0, 179))
-    cv2.setTrackbarPos("S2 min (tipo)", WINDOW_NAME, clamp(tipo_range["s_min"], 0, 255))
-    cv2.setTrackbarPos("S2 max (tipo)", WINDOW_NAME, clamp(tipo_range["s_max"], 0, 255))
-    cv2.setTrackbarPos("V2 min (tipo)", WINDOW_NAME, clamp(tipo_range["v_min"], 0, 255))
-    cv2.setTrackbarPos("V2 max (tipo)", WINDOW_NAME, clamp(tipo_range["v_max"], 0, 255))
+def set_main_hsv_trackbars(hsv_range, param_cache):
+    param_cache["h_min"] = clamp(hsv_range["h_min"], 0, 179)
+    param_cache["h_max"] = clamp(hsv_range["h_max"], 0, 179)
+    param_cache["s_min"] = clamp(hsv_range["s_min"], 0, 255)
+    param_cache["s_max"] = clamp(hsv_range["s_max"], 0, 255)
+    param_cache["v_min"] = clamp(hsv_range["v_min"], 0, 255)
+    param_cache["v_max"] = clamp(hsv_range["v_max"], 0, 255)
 
 
-def read_hybrid_trackbars(tipo):
+def read_main_hsv_trackbars(tipo, param_cache):
     return {
         "type": tipo,
-        "h_min": cv2.getTrackbarPos("H2 min (tipo)", WINDOW_NAME),
-        "h_max": cv2.getTrackbarPos("H2 max (tipo)", WINDOW_NAME),
-        "s_min": cv2.getTrackbarPos("S2 min (tipo)", WINDOW_NAME),
-        "s_max": cv2.getTrackbarPos("S2 max (tipo)", WINDOW_NAME),
-        "v_min": cv2.getTrackbarPos("V2 min (tipo)", WINDOW_NAME),
-        "v_max": cv2.getTrackbarPos("V2 max (tipo)", WINDOW_NAME),
+        "h_min": int(param_cache["h_min"]),
+        "h_max": int(param_cache["h_max"]),
+        "s_min": int(param_cache["s_min"]),
+        "s_max": int(param_cache["s_max"]),
+        "v_min": int(param_cache["v_min"]),
+        "v_max": int(param_cache["v_max"]),
     }
 
 
@@ -235,27 +255,30 @@ def guardar_perfiles(ruta_perfiles, perfiles):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-def aplicar_perfil_trackbars(profile):
+def aplicar_perfil_trackbars(profile, param_cache=None):
     p = sanitize_profile(profile)
-    cv2.setTrackbarPos("Modo (0 Bordes, 1 HSV, 2 Hibrido)", WINDOW_NAME, p["modo"])
-    cv2.setTrackbarPos("Blur (impar)", WINDOW_NAME, p["blur"])
-    cv2.setTrackbarPos("Canny Low", WINDOW_NAME, p["canny_low"])
-    cv2.setTrackbarPos("Canny High", WINDOW_NAME, p["canny_high"])
-    cv2.setTrackbarPos("Kernel (impar)", WINDOW_NAME, p["kernel"])
-
-    cv2.setTrackbarPos("H min", WINDOW_NAME, p["h_min"])
-    cv2.setTrackbarPos("H max", WINDOW_NAME, p["h_max"])
-    cv2.setTrackbarPos("S min", WINDOW_NAME, p["s_min"])
-    cv2.setTrackbarPos("S max", WINDOW_NAME, p["s_max"])
-    cv2.setTrackbarPos("V min", WINDOW_NAME, p["v_min"])
-    cv2.setTrackbarPos("V max", WINDOW_NAME, p["v_max"])
-
-    cv2.setTrackbarPos("Min W", WINDOW_NAME, p["min_w"])
-    cv2.setTrackbarPos("Min H", WINDOW_NAME, p["min_h"])
-    cv2.setTrackbarPos("Max W %", WINDOW_NAME, p["max_w_pct"])
-    cv2.setTrackbarPos("Max H %", WINDOW_NAME, p["max_h_pct"])
-    cv2.setTrackbarPos("Base %", WINDOW_NAME, p["base_pct"])
-    cv2.setTrackbarPos("Margen X %", WINDOW_NAME, p["margen_x_pct"])
+    values = {
+        "modo": p["modo"],
+        "blur": p["blur"],
+        "canny_low": p["canny_low"],
+        "canny_high": p["canny_high"],
+        "kernel": p["kernel"],
+        "h_min": p["h_min"],
+        "h_max": p["h_max"],
+        "s_min": p["s_min"],
+        "s_max": p["s_max"],
+        "v_min": p["v_min"],
+        "v_max": p["v_max"],
+        "min_w": p["min_w"],
+        "min_h": p["min_h"],
+        "max_w_pct": p["max_w_pct"],
+        "max_h_pct": p["max_h_pct"],
+        "base_ratio": p["base_pct"] / 100.0,
+        "x_margin_ratio": p["margen_x_pct"] / 100.0,
+    }
+    if param_cache is not None:
+        param_cache.update(values)
+    return values
 
 
 def perfil_desde_parametros(p, hybrid_hsv_ranges):
@@ -288,6 +311,98 @@ def odd_from_slider(value):
         value += 1
     return value
 
+
+def get_slider_raw_value(params, key):
+    value = params[key]
+    if key in ("base_ratio", "x_margin_ratio"):
+        return int(round(float(value) * 100))
+    return int(round(float(value)))
+
+
+def set_slider_raw_value(params, key, raw_value):
+    if key in ("base_ratio", "x_margin_ratio"):
+        params[key] = float(raw_value) / 100.0
+    else:
+        params[key] = int(raw_value)
+
+
+def draw_slider_panel(width, params, show_advanced):
+    defs = [d for d in SLIDER_DEFS if d["basic"] or show_advanced]
+    cols = 3
+    rows = max(1, int(np.ceil(len(defs) / float(cols))))
+    header_h = 34
+    row_h = 34
+    panel_h = header_h + rows * row_h + 12
+
+    panel = np.full((panel_h, width, 3), 35, dtype=np.uint8)
+    cv2.rectangle(panel, (0, 0), (width - 1, panel_h - 1), (70, 70, 70), 1)
+
+    title = "Controles basicos" if not show_advanced else "Controles basicos + avanzados"
+    cv2.putText(panel, title, (12, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (230, 230, 230), 1, cv2.LINE_AA)
+
+    toggle_w = 170
+    toggle_h = 24
+    toggle_x2 = width - 12
+    toggle_x1 = max(12, toggle_x2 - toggle_w)
+    toggle_y1 = 6
+    toggle_y2 = toggle_y1 + toggle_h
+    toggle_rect = (toggle_x1, toggle_y1, toggle_x2, toggle_y2)
+    cv2.rectangle(panel, (toggle_x1, toggle_y1), (toggle_x2, toggle_y2), (70, 100, 160), -1)
+    cv2.rectangle(panel, (toggle_x1, toggle_y1), (toggle_x2, toggle_y2), (220, 220, 220), 1)
+    toggle_text = "Desplegar avanzados" if not show_advanced else "Ocultar avanzados"
+    cv2.putText(panel, toggle_text, (toggle_x1 + 8, toggle_y1 + 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+
+    margin = 12
+    y0 = header_h
+    cell_w = (width - margin * 2) // cols
+    slider_layout = []
+
+    for i, d in enumerate(defs):
+        col = i % cols
+        row = i // cols
+        cell_x = margin + col * cell_w
+        cell_y = y0 + row * row_h
+
+        x1 = cell_x + 74
+        x2 = cell_x + cell_w - 10
+        y = cell_y + 16
+        if x2 - x1 < 30:
+            continue
+
+        raw_value = get_slider_raw_value(params, d["key"])
+        raw_value = clamp(raw_value, d["min"], d["max"])
+        ratio = 0.0 if d["max"] == d["min"] else (raw_value - d["min"]) / float(d["max"] - d["min"])
+        knob_x = int(round(x1 + ratio * (x2 - x1)))
+
+        cv2.putText(panel, f"{d['label']}: {raw_value}", (cell_x + 2, y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.43, (220, 220, 220), 1, cv2.LINE_AA)
+        cv2.line(panel, (x1, y), (x2, y), (120, 120, 120), 2)
+        cv2.circle(panel, (knob_x, y), 5, (80, 180, 255), -1)
+
+        slider_layout.append({
+            "key": d["key"],
+            "min": d["min"],
+            "max": d["max"],
+            "x1": x1,
+            "x2": x2,
+            "y": y,
+            "hit_y1": y - 10,
+            "hit_y2": y + 10,
+        })
+
+    return panel, panel_h, toggle_rect, slider_layout
+
+
+def slider_value_from_x(x, slider):
+    x1, x2 = slider["x1"], slider["x2"]
+    if x2 <= x1:
+        return slider["min"]
+    t = (x - x1) / float(x2 - x1)
+    t = max(0.0, min(1.0, t))
+    return int(round(slider["min"] + t * (slider["max"] - slider["min"])))
+
+
+def ajustar_tamano_ventana(img_w, img_h, panel_h):
+    cv2.resizeWindow(WINDOW_NAME, max(1500, img_w * 2), max(720, img_h + panel_h + 60))
 
 def build_mask_edges(img, blur_size, canny_low, canny_high, kernel_size):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -404,6 +519,27 @@ def merge_manual_rectangles(rects, iou_threshold=0.2, enabled_types=None):
                     break
 
     return merged
+
+
+def find_rect_at_point(rects, x, y):
+    # Busca desde el ultimo para priorizar el rectangulo mas reciente.
+    for i in range(len(rects) - 1, -1, -1):
+        r = rects[i]
+        rx, ry = int(r["x"]), int(r["y"])
+        rw, rh = int(r["width"]), int(r["height"])
+        if rx <= x <= rx + rw and ry <= y <= ry + rh:
+            return i
+    return -1
+
+
+def is_rect_excluded(rect, excluded_rects, iou_threshold=0.85):
+    rect_type = rect.get("type", "solido")
+    for e in excluded_rects:
+        if e.get("type", "solido") != rect_type:
+            continue
+        if rect_intersection_area(rect, e) > 0 or rect_iou(rect, e) >= iou_threshold:
+            return True
+    return False
 
 
 def deduplicar_colisiones(colisiones, iou_threshold=0.55):
@@ -567,94 +703,36 @@ def seleccionar_rutas_guardado(ruta_imagen, prefijo="rpg"):
     return imagen_salida, json_salida
 
 
-def crear_trackbars():
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-
-    # Modo: 0 = Canny + morph, 1 = HSV + morph, 2 = híbrido automático
-    cv2.createTrackbar("Modo (0 Bordes, 1 HSV, 2 Hibrido)", WINDOW_NAME, 0, 2, noop)
-
-    # Bordes
-    cv2.createTrackbar("Blur (impar)", WINDOW_NAME, 5, 31, noop)
-    cv2.createTrackbar("Canny Low", WINDOW_NAME, 35, 255, noop)
-    cv2.createTrackbar("Canny High", WINDOW_NAME, 110, 255, noop)
-    cv2.createTrackbar("Kernel (impar)", WINDOW_NAME, 5, 31, noop)
-
-    # HSV
-    cv2.createTrackbar("H min", WINDOW_NAME, 0, 179, noop)
-    cv2.createTrackbar("H max", WINDOW_NAME, 179, 179, noop)
-    cv2.createTrackbar("S min", WINDOW_NAME, 0, 255, noop)
-    cv2.createTrackbar("S max", WINDOW_NAME, 255, 255, noop)
-    cv2.createTrackbar("V min", WINDOW_NAME, 0, 255, noop)
-    cv2.createTrackbar("V max", WINDOW_NAME, 255, 255, noop)
-
-    # HSV por tipo para modo híbrido (edición en caliente)
-    cv2.createTrackbar("H2 min (tipo)", WINDOW_NAME, 0, 179, noop)
-    cv2.createTrackbar("H2 max (tipo)", WINDOW_NAME, 179, 179, noop)
-    cv2.createTrackbar("S2 min (tipo)", WINDOW_NAME, 0, 255, noop)
-    cv2.createTrackbar("S2 max (tipo)", WINDOW_NAME, 255, 255, noop)
-    cv2.createTrackbar("V2 min (tipo)", WINDOW_NAME, 0, 255, noop)
-    cv2.createTrackbar("V2 max (tipo)", WINDOW_NAME, 255, 255, noop)
-
-    # Filtros de cajas
-    cv2.createTrackbar("Min W", WINDOW_NAME, 24, 500, noop)
-    cv2.createTrackbar("Min H", WINDOW_NAME, 24, 500, noop)
-    cv2.createTrackbar("Max W %", WINDOW_NAME, 90, 100, noop)
-    cv2.createTrackbar("Max H %", WINDOW_NAME, 90, 100, noop)
-    cv2.createTrackbar("Base %", WINDOW_NAME, 40, 100, noop)
-    cv2.createTrackbar("Margen X %", WINDOW_NAME, 5, 40, noop)
-
-    # Editor numerico para rectangulo manual seleccionado
-    cv2.createTrackbar("Manual X", WINDOW_NAME, 0, 5000, noop)
-    cv2.createTrackbar("Manual Y", WINDOW_NAME, 0, 5000, noop)
-    cv2.createTrackbar("Manual W", WINDOW_NAME, 1, 5000, noop)
-    cv2.createTrackbar("Manual H", WINDOW_NAME, 1, 5000, noop)
+def crear_trackbars(controles_plegados=False, valores_iniciales=None):
+    _ = controles_plegados
+    _ = valores_iniciales
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_NORMAL)
 
 
-def leer_parametros():
-    modo = cv2.getTrackbarPos("Modo (0 Bordes, 1 HSV, 2 Hibrido)", WINDOW_NAME)
+def leer_parametros(ultimos_parametros):
+    p = dict(ultimos_parametros)
+    p["modo"] = clamp(p["modo"], 0, 2)
+    p["blur"] = odd_from_slider(clamp(p["blur"], 1, 31))
+    p["canny_low"] = clamp(p["canny_low"], 0, 255)
+    p["canny_high"] = clamp(p["canny_high"], 1, 255)
+    if p["canny_high"] <= p["canny_low"]:
+        p["canny_high"] = min(255, p["canny_low"] + 1)
+    p["kernel"] = odd_from_slider(clamp(p["kernel"], 1, 31))
 
-    blur = odd_from_slider(cv2.getTrackbarPos("Blur (impar)", WINDOW_NAME))
-    canny_low = cv2.getTrackbarPos("Canny Low", WINDOW_NAME)
-    canny_high = cv2.getTrackbarPos("Canny High", WINDOW_NAME)
-    if canny_high <= canny_low:
-        canny_high = min(255, canny_low + 1)
+    p["h_min"] = clamp(p["h_min"], 0, 179)
+    p["h_max"] = clamp(p["h_max"], 0, 179)
+    p["s_min"] = clamp(p["s_min"], 0, 255)
+    p["s_max"] = clamp(p["s_max"], 0, 255)
+    p["v_min"] = clamp(p["v_min"], 0, 255)
+    p["v_max"] = clamp(p["v_max"], 0, 255)
 
-    kernel = odd_from_slider(cv2.getTrackbarPos("Kernel (impar)", WINDOW_NAME))
-
-    h_min = cv2.getTrackbarPos("H min", WINDOW_NAME)
-    h_max = cv2.getTrackbarPos("H max", WINDOW_NAME)
-    s_min = cv2.getTrackbarPos("S min", WINDOW_NAME)
-    s_max = cv2.getTrackbarPos("S max", WINDOW_NAME)
-    v_min = cv2.getTrackbarPos("V min", WINDOW_NAME)
-    v_max = cv2.getTrackbarPos("V max", WINDOW_NAME)
-
-    min_w = cv2.getTrackbarPos("Min W", WINDOW_NAME)
-    min_h = cv2.getTrackbarPos("Min H", WINDOW_NAME)
-    max_w_pct = max(1, cv2.getTrackbarPos("Max W %", WINDOW_NAME))
-    max_h_pct = max(1, cv2.getTrackbarPos("Max H %", WINDOW_NAME))
-    base_ratio = cv2.getTrackbarPos("Base %", WINDOW_NAME) / 100.0
-    x_margin_ratio = cv2.getTrackbarPos("Margen X %", WINDOW_NAME) / 100.0
-
-    return {
-        "modo": modo,
-        "blur": blur,
-        "canny_low": canny_low,
-        "canny_high": canny_high,
-        "kernel": kernel,
-        "h_min": h_min,
-        "h_max": h_max,
-        "s_min": s_min,
-        "s_max": s_max,
-        "v_min": v_min,
-        "v_max": v_max,
-        "min_w": min_w,
-        "min_h": min_h,
-        "max_w_pct": max_w_pct,
-        "max_h_pct": max_h_pct,
-        "base_ratio": base_ratio,
-        "x_margin_ratio": x_margin_ratio,
-    }
-
+    p["min_w"] = clamp(p["min_w"], 0, 500)
+    p["min_h"] = clamp(p["min_h"], 0, 500)
+    p["max_w_pct"] = clamp(p["max_w_pct"], 1, 100)
+    p["max_h_pct"] = clamp(p["max_h_pct"], 1, 100)
+    p["base_ratio"] = max(0.0, min(1.0, float(p["base_ratio"])))
+    p["x_margin_ratio"] = max(0.0, min(0.40, float(p["x_margin_ratio"])))
+    return p
 
 def extraer_colisiones_rpg_interactivo(ruta_imagen):
     img = cv2.imread(ruta_imagen)
@@ -662,7 +740,29 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
         print(f"Error: No se pudo cargar la imagen '{ruta_imagen}'")
         return
 
+    perfil_base = sanitize_profile(DEFAULT_PROFILES["bosque"])
+    param_cache = {
+        "modo": perfil_base["modo"],
+        "blur": perfil_base["blur"],
+        "canny_low": perfil_base["canny_low"],
+        "canny_high": perfil_base["canny_high"],
+        "kernel": perfil_base["kernel"],
+        "h_min": perfil_base["h_min"],
+        "h_max": perfil_base["h_max"],
+        "s_min": perfil_base["s_min"],
+        "s_max": perfil_base["s_max"],
+        "v_min": perfil_base["v_min"],
+        "v_max": perfil_base["v_max"],
+        "min_w": perfil_base["min_w"],
+        "min_h": perfil_base["min_h"],
+        "max_w_pct": perfil_base["max_w_pct"],
+        "max_h_pct": perfil_base["max_h_pct"],
+        "base_ratio": perfil_base["base_pct"] / 100.0,
+        "x_margin_ratio": perfil_base["margen_x_pct"] / 100.0,
+    }
+
     crear_trackbars()
+    ajustar_tamano_ventana(img.shape[1], img.shape[0], 0)
 
     base_dir = os.path.dirname(os.path.abspath(ruta_imagen))
     ruta_perfiles = os.path.join(base_dir, PROFILE_FILE)
@@ -686,7 +786,16 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
         "last_selected_idx": -2,
         "move_offset": (0, 0),
         "resize_handle_size": 12,
+        "last_auto_rects": [],
+        "excluded_auto_rects": [],
         "save_requested": False,
+        "show_sliders": False,
+        "show_advanced": False,
+        "panel_height": 0,
+        "last_panel_height": -1,
+        "slider_layout": [],
+        "toggle_rect": (0, 0, 0, 0),
+        "active_slider": None,
     }
 
     color_por_tipo = {
@@ -710,69 +819,114 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             h = max(1, img_h - y)
         rect["x"], rect["y"], rect["width"], rect["height"] = x, y, w, h
 
-    def find_manual_rect_at_point(x, y):
-        # Busca desde el ultimo para priorizar el rectángulo dibujado más reciente.
-        for i in range(len(ui_state["manual_rects"]) - 1, -1, -1):
-            r = ui_state["manual_rects"][i]
-            rx, ry = r["x"], r["y"]
-            rw, rh = r["width"], r["height"]
-            if rx <= x <= rx + rw and ry <= y <= ry + rh:
-                return i
-        return -1
-
     def on_mouse(event, x, y, _flags, _param):
-        if x >= img_w or y >= img_h:
+        panel_h = ui_state["panel_height"]
+
+        if y < panel_h:
+            if event == cv2.EVENT_LBUTTONDOWN:
+                tx1, ty1, tx2, ty2 = ui_state["toggle_rect"]
+                if tx1 <= x <= tx2 and ty1 <= y <= ty2:
+                    ui_state["show_advanced"] = not ui_state["show_advanced"]
+                    return
+
+                for slider in ui_state["slider_layout"]:
+                    if slider["x1"] <= x <= slider["x2"] and slider["hit_y1"] <= y <= slider["hit_y2"]:
+                        raw_value = slider_value_from_x(x, slider)
+                        set_slider_raw_value(param_cache, slider["key"], raw_value)
+                        ui_state["active_slider"] = slider["key"]
+                        return
+
+            elif event == cv2.EVENT_MOUSEMOVE and ui_state["active_slider"] is not None:
+                for slider in ui_state["slider_layout"]:
+                    if slider["key"] == ui_state["active_slider"]:
+                        raw_value = slider_value_from_x(x, slider)
+                        set_slider_raw_value(param_cache, slider["key"], raw_value)
+                        break
+
+            elif event == cv2.EVENT_LBUTTONUP:
+                ui_state["active_slider"] = None
+            return
+
+        y_img = y - panel_h
+        if x >= img_w or y_img < 0 or y_img >= img_h:
             return
 
         bx1, by1, bx2, by2 = button_rect
 
         if event == cv2.EVENT_LBUTTONDOWN:
-            if bx1 <= x <= bx2 and by1 <= y <= by2:
+            if bx1 <= x <= bx2 and by1 <= y_img <= by2:
                 ui_state["save_requested"] = True
                 return
 
-            selected = find_manual_rect_at_point(x, y)
+            selected = find_rect_at_point(ui_state["manual_rects"], x, y_img)
             if selected != -1:
                 ui_state["selected_idx"] = selected
                 rect = ui_state["manual_rects"][selected]
                 handle = ui_state["resize_handle_size"]
                 hx1 = rect["x"] + rect["width"] - handle
                 hy1 = rect["y"] + rect["height"] - handle
-                if hx1 <= x <= rect["x"] + rect["width"] and hy1 <= y <= rect["y"] + rect["height"]:
+                if hx1 <= x <= rect["x"] + rect["width"] and hy1 <= y_img <= rect["y"] + rect["height"]:
                     ui_state["interaction"] = "resizing"
                 else:
                     ui_state["interaction"] = "moving"
-                    ui_state["move_offset"] = (x - rect["x"], y - rect["y"])
-                ui_state["current"] = clamp_point(x, y)
+                    ui_state["move_offset"] = (x - rect["x"], y_img - rect["y"])
+                ui_state["current"] = clamp_point(x, y_img)
+                return
+
+            selected_auto = find_rect_at_point(ui_state["last_auto_rects"], x, y_img)
+            if selected_auto != -1:
+                auto_rect = ui_state["last_auto_rects"][selected_auto]
+                ui_state["manual_rects"].append(
+                    {
+                        "x": int(auto_rect["x"]),
+                        "y": int(auto_rect["y"]),
+                        "width": int(auto_rect["width"]),
+                        "height": int(auto_rect["height"]),
+                        "type": auto_rect.get("type", "solido"),
+                        "source": "auto_edit",
+                    }
+                )
+                ui_state["selected_idx"] = len(ui_state["manual_rects"]) - 1
+                rect = ui_state["manual_rects"][ui_state["selected_idx"]]
+                handle = ui_state["resize_handle_size"]
+                hx1 = rect["x"] + rect["width"] - handle
+                hy1 = rect["y"] + rect["height"] - handle
+                if hx1 <= x <= rect["x"] + rect["width"] and hy1 <= y_img <= rect["y"] + rect["height"]:
+                    ui_state["interaction"] = "resizing"
+                else:
+                    ui_state["interaction"] = "moving"
+                    ui_state["move_offset"] = (x - rect["x"], y_img - rect["y"])
+                ui_state["current"] = clamp_point(x, y_img)
                 return
 
             ui_state["selected_idx"] = -1
             ui_state["interaction"] = "drawing"
-            ui_state["start"] = clamp_point(x, y)
-            ui_state["current"] = clamp_point(x, y)
+            ui_state["start"] = clamp_point(x, y_img)
+            ui_state["current"] = clamp_point(x, y_img)
 
         elif event == cv2.EVENT_MOUSEMOVE:
             if ui_state["interaction"] == "drawing":
-                ui_state["current"] = clamp_point(x, y)
+                ui_state["current"] = clamp_point(x, y_img)
             elif ui_state["interaction"] == "moving" and ui_state["selected_idx"] != -1:
                 nx = x - ui_state["move_offset"][0]
-                ny = y - ui_state["move_offset"][1]
+                ny = y_img - ui_state["move_offset"][1]
                 r = ui_state["manual_rects"][ui_state["selected_idx"]]
                 r["x"] = nx
                 r["y"] = ny
                 normalize_manual_rect(r)
-                ui_state["current"] = clamp_point(x, y)
+                ui_state["current"] = clamp_point(x, y_img)
             elif ui_state["interaction"] == "resizing" and ui_state["selected_idx"] != -1:
                 r = ui_state["manual_rects"][ui_state["selected_idx"]]
-                cx, cy = clamp_point(x, y)
+                cx, cy = clamp_point(x, y_img)
                 r["width"] = max(1, cx - r["x"])
                 r["height"] = max(1, cy - r["y"])
                 normalize_manual_rect(r)
                 ui_state["current"] = (cx, cy)
 
         elif event == cv2.EVENT_LBUTTONUP:
+            ui_state["active_slider"] = None
             if ui_state["interaction"] == "drawing":
-                ui_state["current"] = clamp_point(x, y)
+                ui_state["current"] = clamp_point(x, y_img)
                 x1 = min(ui_state["start"][0], ui_state["current"][0])
                 y1 = min(ui_state["start"][1], ui_state["current"][1])
                 x2 = max(ui_state["start"][0], ui_state["current"][0])
@@ -799,13 +953,25 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             ui_state["interaction"] = "none"
 
         elif event == cv2.EVENT_RBUTTONDOWN:
-            selected = find_manual_rect_at_point(x, y)
+            selected = find_rect_at_point(ui_state["manual_rects"], x, y_img)
             if selected != -1:
                 del ui_state["manual_rects"][selected]
                 if ui_state["selected_idx"] == selected:
                     ui_state["selected_idx"] = -1
                 elif ui_state["selected_idx"] > selected:
                     ui_state["selected_idx"] -= 1
+                return
+
+            selected_auto = find_rect_at_point(ui_state["last_auto_rects"], x, y_img)
+            if selected_auto != -1:
+                auto_rect = dict(ui_state["last_auto_rects"][selected_auto])
+                auto_rect["source"] = "auto_exclusion"
+                ui_state["excluded_auto_rects"].append(auto_rect)
+                print(
+                    f"Auto excluido: {auto_rect.get('type', 'solido')} "
+                    f"x:{auto_rect['x']} y:{auto_rect['y']} "
+                    f"w:{auto_rect['width']} h:{auto_rect['height']}"
+                )
 
     cv2.setMouseCallback(WINDOW_NAME, on_mouse)
     
@@ -826,27 +992,29 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
     }
 
     if perfil_activo in perfiles:
-        aplicar_perfil_trackbars(perfiles[perfil_activo])
+        aplicar_perfil_trackbars(perfiles[perfil_activo], param_cache)
         hybrid_hsv_ranges = deepcopy(perfiles[perfil_activo].get("hybrid_hsv_ranges", HYBRID_HSV_RANGES))
 
-    set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
+    set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
 
     print("Controles:")
     print("- Ajusta sliders en tiempo real")
     print("- Clic izquierdo y arrastrar en imagen para crear rectangulo manual")
+    print("- Clic izquierdo sobre automatico: convertir a editable y ajustar")
     print("- Clic izquierdo sobre rectangulo manual: seleccionar y mover")
     print("- Arrastrar esquina inferior derecha del seleccionado: redimensionar")
     print("- Clic derecho sobre rectangulo manual: borrar")
+    print("- Clic derecho sobre automatico: excluir (borrar automatico)")
     print("- Teclas n/p seleccionan siguiente/anterior rectangulo manual")
-    print("- Trackbars Manual X/Y/W/H editan numericamente el seleccionado")
     print("- Tipos manuales: a=agua, t=tejado, v=vegetacion, o=solido")
     print("- Boton GUARDAR (en la imagen) o tecla 's' para elegir donde guardar")
     print("- Tecla 'g' para guardar perfil actual como 'custom'")
     print("- Teclas 1/2/3/4 para cargar perfil bosque/ciudad/costa/custom")
-    print("- Tecla 'a' selecciona tipo agua, 't' tipo tejado, 'v' tipo vegetacion")
-    print("- Tecla 'u' aplica sliders H2/S2/V2 al tipo seleccionado")
+    print("- Tecla 'a'/'t'/'v' cambia tipo híbrido activo y carga su HSV en sliders")
     print("- Mayúsculas A/T/V/O togglean visibilidad agua/tejado/vegetacion/solidos")
     print("- Tecla 'z' deshace ultimo rectangulo manual, 'c' limpia todos")
+    print("- Tecla 'e' limpia exclusiones de automaticos borrados")
+    print("- Tecla 'h' pliega/despliega sliders")
     print("- Tecla 'm' fusiona manuales solapados (mismo tipo)")
     print("- Teclas k/l/b/r: toggle merge de solido/agua/tejado/vegetacion")
     print("- Presets merge: 5=solo solido, 6=solo agua, 7=todos")
@@ -858,12 +1026,14 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
     ultimo_modo = "bordes"
 
     while True:
-        p = leer_parametros()
+        p = leer_parametros(param_cache)
+        param_cache = p
 
-        # Sincroniza en vivo los sliders H2/S2/V2 con el tipo activo del modo híbrido.
-        rango_actualizado = read_hybrid_trackbars(tipo_hibrido_activo)
-        slot = ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo)
-        slot.update(rango_actualizado)
+        # En modo híbrido, sliders HSV principales editan el tipo híbrido activo.
+        if p["modo"] == 2:
+            rango_actualizado = read_main_hsv_trackbars(tipo_hibrido_activo, param_cache)
+            slot = ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo)
+            slot.update(rango_actualizado)
 
         if p["modo"] == 0:
             _, mask = build_mask_edges(
@@ -965,26 +1135,16 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             colisiones = deduplicar_colisiones(colisiones, iou_threshold=0.55)
             mask = cv2.bitwise_or(mask_edges, mask_hsv_total)
 
+        # Excluir rectangulos automaticos borrados con clic derecho.
+        colisiones = [
+            c
+            for c in colisiones
+            if not is_rect_excluded(c, ui_state["excluded_auto_rects"], iou_threshold=0.85)
+        ]
+        ui_state["last_auto_rects"] = [dict(c) for c in colisiones]
+        cajas_visuales = [(c["x"], c["y"], c["width"], c["height"]) for c in colisiones]
+
         manual_rects = list(ui_state["manual_rects"])
-
-        # Sincroniza trackbars del editor numerico con el rectangulo seleccionado.
-        if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-            if ui_state["selected_idx"] != ui_state["last_selected_idx"]:
-                sel = ui_state["manual_rects"][ui_state["selected_idx"]]
-                cv2.setTrackbarPos("Manual X", WINDOW_NAME, max(0, min(5000, int(sel["x"]))))
-                cv2.setTrackbarPos("Manual Y", WINDOW_NAME, max(0, min(5000, int(sel["y"]))))
-                cv2.setTrackbarPos("Manual W", WINDOW_NAME, max(1, min(5000, int(sel["width"]))))
-                cv2.setTrackbarPos("Manual H", WINDOW_NAME, max(1, min(5000, int(sel["height"]))))
-                ui_state["last_selected_idx"] = ui_state["selected_idx"]
-
-            sel = ui_state["manual_rects"][ui_state["selected_idx"]]
-            sel["x"] = cv2.getTrackbarPos("Manual X", WINDOW_NAME)
-            sel["y"] = cv2.getTrackbarPos("Manual Y", WINDOW_NAME)
-            sel["width"] = max(1, cv2.getTrackbarPos("Manual W", WINDOW_NAME))
-            sel["height"] = max(1, cv2.getTrackbarPos("Manual H", WINDOW_NAME))
-            normalize_manual_rect(sel)
-        else:
-            ui_state["last_selected_idx"] = -2
 
         manual_cajas = [(m["x"], m["y"], m["width"], m["height"]) for m in manual_rects]
 
@@ -1130,7 +1290,36 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             1,
             cv2.LINE_AA,
         )
-        cv2.imshow(WINDOW_NAME, vista)
+        cv2.putText(
+            vista,
+            f"Sliders: {'OCULTOS' if not ui_state['show_sliders'] else ('BASICOS' if not ui_state['show_advanced'] else 'BASICOS+AVANZADOS')} (h)",
+            (10, 115),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+            cv2.LINE_AA,
+        )
+
+        if ui_state["show_sliders"]:
+            panel_controles, panel_h, toggle_rect, slider_layout = draw_slider_panel(
+                vista.shape[1],
+                param_cache,
+                ui_state["show_advanced"],
+            )
+            ui_state["panel_height"] = panel_h
+            ui_state["toggle_rect"] = toggle_rect
+            ui_state["slider_layout"] = slider_layout
+
+            if panel_h != ui_state["last_panel_height"]:
+                ajustar_tamano_ventana(img_w, img_h, panel_h)
+                ui_state["last_panel_height"] = panel_h
+
+            frame = np.vstack((panel_controles, vista))
+            cv2.imshow(WINDOW_NAME, frame)
+        else:
+            ui_state["panel_height"] = 0
+            cv2.imshow(WINDOW_NAME, vista)
 
         ultima_preview = preview
         ultimas_colisiones = colisiones_total
@@ -1196,31 +1385,27 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             ui_state["manual_type"] = "agua"
             if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
                 ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "agua"
-            set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
+            set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
             print("Tipo híbrido activo: agua")
         elif key == ord("t"):
             tipo_hibrido_activo = "tejado"
             ui_state["manual_type"] = "tejado"
             if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
                 ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "tejado"
-            set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
+            set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
             print("Tipo híbrido activo: tejado")
         elif key == ord("v"):
             tipo_hibrido_activo = "vegetacion"
             ui_state["manual_type"] = "vegetacion"
             if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
                 ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "vegetacion"
-            set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
+            set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
             print("Tipo híbrido activo: vegetacion")
         elif key == ord("o"):
             ui_state["manual_type"] = "solido"
             if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
                 ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "solido"
             print("Tipo manual activo: solido")
-        elif key == ord("u"):
-            slot = ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo)
-            slot.update(read_hybrid_trackbars(tipo_hibrido_activo))
-            print(f"Rango actualizado para tipo: {tipo_hibrido_activo}")
         elif key == ord("m"):
             before = len(ui_state["manual_rects"])
             enabled_merge_types = [t for t, enabled in merge_types_enabled.items() if enabled]
@@ -1295,16 +1480,27 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             ui_state["manual_rects"].clear()
             ui_state["selected_idx"] = -1
             print("Se limpiaron todos los rectangulos manuales.")
+        elif key == ord("e"):
+            ui_state["excluded_auto_rects"].clear()
+            print("Se limpiaron exclusiones de automaticos.")
+        elif key == ord("h"):
+            ui_state["show_sliders"] = not ui_state["show_sliders"]
+            if ui_state["show_sliders"]:
+                ajustar_tamano_ventana(img_w, img_h, 180)
+            else:
+                ajustar_tamano_ventana(img_w, img_h, 0)
+                ui_state["panel_height"] = 0
+            print(f"Sliders {'visibles' if ui_state['show_sliders'] else 'ocultos'}.")
         elif key in (ord("1"), ord("2"), ord("3"), ord("4")):
             idx = int(chr(key)) - 1
             if 0 <= idx < len(profile_keys):
                 target = profile_keys[idx]
                 if target in perfiles:
-                    aplicar_perfil_trackbars(perfiles[target])
+                    aplicar_perfil_trackbars(perfiles[target], param_cache)
                     hybrid_hsv_ranges = deepcopy(perfiles[target].get("hybrid_hsv_ranges", HYBRID_HSV_RANGES))
                     if tipo_hibrido_activo not in tipos_hibridos:
                         tipo_hibrido_activo = "agua"
-                    set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
+                    set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
                     perfil_activo = target
                     print(f"Perfil cargado: {target}")
                 else:
