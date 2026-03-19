@@ -1,0 +1,144 @@
+# 🎮 CHEAT SHEET - Atajos de teclado
+
+```
+╔════════════════════════════════════════════════════════════════════╗
+║         EXTRACTOR DE COLISIONES RPG - ATAJOS RÁPIDOS              ║
+╚════════════════════════════════════════════════════════════════════╝
+
+┌─ CARGAR PERFILES ────────────────────────────────────────────────┐
+│ 1  → Bosque           (especializado vegetación)                   │
+│ 2  → Ciudad           (edificios/estructuras)                      │
+│ 3  → Costa            (agua/playas)                                │
+│ 4  → Custom           (tu configuración guardada)                  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ GUARDAR / EXPORTAR ─────────────────────────────────────────────┐
+│ G  → Guardar perfil actual como "custom"                          │
+│ S  → Exportar JSON + imagen preview                               │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ TIPO HSV HÍBRIDO (a / t / v) ───────────────────────────────────┐
+│ A  → Editar rango de AGUA       (sliders H2/S2/V2)                │
+│ T  → Editar rango de TEJADO     (sliders H2/S2/V2)                │
+│ V  → Editar rango de VEGETACION (sliders H2/S2/V2)                │
+│ U  → Aplicar cambios al tipo seleccionado                         │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ TOGGLES DE VISIBILIDAD (MAYÚSCULAS) ────────────────────────────┐
+│ SHIFT+A  → Toggle AGUA on/off      (Amarillo en preview)          │
+│ SHIFT+T  → Toggle TEJADO on/off    (Cyan en preview)              │
+│ SHIFT+V  → Toggle VEGETACION on/off (Verde en preview)            │
+│ SHIFT+O  → Toggle SOLIDOS on/off   (Rojo en preview)              │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ SALIR ──────────────────────────────────────────────────────────┐
+│ Q    → Salir                                                       │
+│ ESC  → Salir                                                       │
+└──────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════╗
+║                        SLIDERS (Ventana)                           ║
+╚════════════════════════════════════════════════════════════════════╝
+
+Modo de detección:
+  0 = Bordes (Canny + morfología)
+  1 = HSV manual (color)
+  2 = Híbrido (bordes + HSV por tipos)
+
+BLUR (impar): 1-31
+  Bajo (3-5):  Mantiene detalles
+  Alto (7-9):  Reduce ruido
+
+CANNY Low/High: 0-255
+  Diferencia mínima: ~50 puntos
+  Bajo Low (20):     Detecta más (menos filtrado)
+  Alto Low (60):     Detecta menos (filtrado fuerte)
+
+KERNEL (impar): 1-31
+  Bajo (3-5):  Preserva detalles
+  Alto (7-9):  Une fragmentos
+
+Min W/H: Tamaño mínimo en píxeles
+  Para pixel art: 16-32
+
+Max W%/H%: Tamaño máximo como % de imagen
+  Típico: 85-95%
+
+Base%: Altura de colisión (% de altura del objeto)
+  RPG Top-Down: 35-45%
+
+Margen X%: Margen lateral (% del ancho)
+  Típico: 4-8%
+
+╔════════════════════════════════════════════════════════════════════╗
+║                        COLORES EN PREVIEW                         ║
+╚════════════════════════════════════════════════════════════════════╝
+
+AZUL CLARO  = Contorno visual del objeto detectado
+ROJO        = Caja de colisión tipo SOLIDO
+AMARILLO    = Caja de colisión tipo AGUA
+CYAN        = Caja de colisión tipo TEJADO
+VERDE       = Caja de colisión tipo VEGETACION
+
+BLANCO (right panel) = Máscara binaria (blanco=detectado)
+
+╔════════════════════════════════════════════════════════════════════╗
+║                         FLUJO TÍPICO                              ║
+╚════════════════════════════════════════════════════════════════════╝
+
+1. Ejecuta: python generar_colisiones.py
+2. Presiona 2 (carga "ciudad" como base)
+3. Ajusta Blur hasta ver bien en máscara derecha
+4. Presiona A/T/V/O para verificar cada tipo
+5. Si algo falla: edita tipo con a/t/v y sliders H2/S2/V2, luego U
+6. Presiona G para guardar tu configuración
+7. Presiona S para exportar archivos
+8. Presiona Q para salir
+
+╔════════════════════════════════════════════════════════════════════╗
+║                    SOLUCIÓN DE PROBLEMAS                          ║
+╚════════════════════════════════════════════════════════════════════╝
+
+❌ No detecta nada
+   → Sube Blur a 5-7
+   → Baja Canny Low a 20-35
+
+❌ Demasiado ruido
+   → Baja Blur a 3
+   → Sube Canny Low a 50+
+
+❌ Objetos fragmentados
+   → Sube Kernel a 7-9
+   → Aumenta Min W/H
+
+❌ Agua/tipos mal detectados
+   → Pulsa A/T/V para editar
+   → Ajusta H2 min/max (tonalidad)
+   → Pulsa U para aplicar
+
+✅ Para guardar y continuar después
+   → Presiona G (guarda como custom)
+   → Presiona 4 para cargar custom la próxima vez
+
+╔════════════════════════════════════════════════════════════════════╗
+║               ARCHIVOS GENERADOS AL EXPORTAR (S)                  ║
+╚════════════════════════════════════════════════════════════════════╝
+
+mapa_con_colisiones_rpg_MODO.jpg
+  → Imagen preview con cajas dibujadas
+  → Úsala para verificar visualmente
+
+datos_colisiones_rpg_MODO.json
+  → JSON estructurado por tipo
+  → Importa en tu motor de juego
+
+perfiles_colisiones_rpg.json
+  → Perfiles guardados con G
+  → Cargados con 1/2/3/4
+
+```
+
+---
+
+**Imprime esto o ponlo al lado del monitor mientras usas el script!** 📋
+
