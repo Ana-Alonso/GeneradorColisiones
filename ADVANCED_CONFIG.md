@@ -1,314 +1,148 @@
-# Configuración avanzada - Ejemplos
+# Configuracion avanzada
 
-Este archivo contiene ejemplos de configuraciones personalizadas y trucos para casos especiales.
+Esta guia documenta ajustes finos del script actual (`generar_colisiones.py`) y estrategias para distintos mapas.
 
-## 1. Crear un perfil personalizado para tu mapa
+## 1. Donde se guardan los perfiles
 
-### Opción A: Usar la interfaz (Recomendado)
+El archivo `perfiles_colisiones_rpg.json` se guarda en la carpeta de la imagen que abriste.
 
-1. Ejecuta el script
-2. Ajusta todos los parámetros con los sliders
-3. Pulsa **g** para guardar como "custom"
-4. El perfil se guarda en `perfiles_colisiones_rpg.json`
+Campos por perfil:
 
-### Opción B: Editar JSON directamente
+- `modo`, `blur`, `canny_low`, `canny_high`, `kernel`
+- `h_min/h_max`, `s_min/s_max`, `v_min/v_max`
+- `min_w`, `min_h`, `max_w_pct`, `max_h_pct`
+- `base_pct`, `margen_x_pct`
+- `hybrid_hsv_ranges` (lista por tipo)
 
-Después de ejecutar una vez (para que se cree `perfiles_colisiones_rpg.json`), edita:
+## 2. Rango HSV por tipo en modo hibrido
+
+Tipos incluidos por defecto:
+
+- `agua`
+- `tejado`
+- `vegetacion`
+
+Cada tipo usa:
 
 ```json
 {
-  "bosque": { ... },
-  "ciudad": { ... },
-  "costa": { ... },
-  "custom": {
-    "modo": 2,
-    "blur": 5,
-    "canny_low": 30,
-    "canny_high": 100,
-    "kernel": 7,
-    "h_min": 0,
-    "h_max": 179,
-    "s_min": 0,
-    "s_max": 255,
-    "v_min": 0,
-    "v_max": 255,
-    "min_w": 20,
-    "min_h": 20,
-    "max_w_pct": 90,
-    "max_h_pct": 90,
-    "base_pct": 40,
-    "margen_x_pct": 5,
-    "hybrid_hsv_ranges": [
-      {
-        "type": "agua",
-        "h_min": 80,
-        "h_max": 130,
-        "s_min": 40,
-        "s_max": 255,
-        "v_min": 20,
-        "v_max": 255
-      },
-      {
-        "type": "tejado",
-        "h_min": 0,
-        "h_max": 25,
-        "s_min": 50,
-        "s_max": 255,
-        "v_min": 40,
-        "v_max": 255
-      },
-      {
-        "type": "vegetacion",
-        "h_min": 35,
-        "h_max": 90,
-        "s_min": 35,
-        "s_max": 255,
-        "v_min": 20,
-        "v_max": 255
-      }
-    ]
-  }
+  "type": "agua",
+  "h_min": 80,
+  "h_max": 130,
+  "s_min": 40,
+  "s_max": 255,
+  "v_min": 20,
+  "v_max": 255
 }
 ```
 
-## 2. Casos de uso frecuentes
+Para ajustar en caliente:
 
-### Caso: Detectar solo agua (río/lago)
+1. Pulsa `a`, `t` o `v`.
+2. Mueve sliders `H2/S2/V2`.
+3. Pulsa `u`.
 
-```bash
-# En el script:
-# 1. Pulsa 2 o 4 (cargar un perfil)
-# 2. Pulsa O para desactivar solidos
-# 3. Pulsa T para desactivar tejado
-# 4. Pulsa V para desactivar vegetacion
-# 5. Pulsa s para guardar (solo agua)
-```
+## 3. Calibracion por escenario
 
-### Caso: Mapas con mucho dithering (ruido visual)
+### Mapa con mucho ruido de textura
 
-```
-Aumentar:
-- Blur: 7-9
-- Kernel: 7-9
-- Canny Low: 50-70
+- `Blur`: 5-9
+- `Kernel`: 7-9
+- `Canny Low`: 45-80
+- `Min W/H`: subir para filtrar objetos pequenos
 
-Reducir:
-- Canny High: 100-130 (menos sensible a transiciones suaves)
-```
+### Mapa muy limpio y pixel art fino
 
-### Caso: Mapas con colores saturados
+- `Blur`: 3-5
+- `Kernel`: 3-5
+- `Canny Low`: 20-40
+- `Min W/H`: 12-20
 
-```
-Editar HYBRID_HSV_RANGES en el código:
-- Reducir S_min a 0 (permita colores desaturados)
-- Expandir rangos H (ej: agua 70-140 en lugar de 80-130)
-```
+### Falta deteccion en base de obstaculos
 
-### Caso: Pixel art muy pequeño (32x32 tiles)
+- Sube `Base %` (ej. 45-55) para hacer colision mas alta.
+- Reduce `Margen X %` (ej. 2-4) para ensanchar la base.
 
-```
-- Min W/H: 12-16 (objetos mínimos)
-- Blur: 3 (preservar detalles)
-- Kernel: 3-5 (conexiones suaves)
-- Base%: 35-40 (colisión en parte más baja)
-```
+### Exceso de colisiones gigantes
 
-### Caso: Pixel art muy grande (128x128 tiles)
+- Baja `Max W %` y `Max H %`.
+- En mapas grandes suele funcionar 80-92.
 
-```
-- Min W/H: 40-60
-- Blur: 5-7
-- Kernel: 7-9
-- Base%: 35-45
-```
+## 4. Edicion manual precisa
 
-## 3. Valores de referencia por tipo de arte
+Funciones soportadas:
 
-### Stardew Valley / Grounded (pixel art chico, colores planos)
-```
-Modo: 2 (híbrido)
-Blur: 3
-Canny Low: 25
-Canny High: 95
-Kernel: 5
-Min W/H: 16
-Base%: 40
-Margen X%: 5
-```
+- Dibujar y mover con mouse.
+- Redimensionar con handle inferior derecho.
+- Seleccion por teclado con `n/p`.
+- Edicion numerica con trackbars `Manual X/Y/W/H`.
+- Borrado de seleccionado con `x`.
+- `z` deshace ultimo.
+- `c` limpia todo.
 
-### Zelda Link's Awakening (colores simples, formas geométricas)
-```
-Modo: 2
-Blur: 5
-Canny Low: 35
-Canny High: 120
-Kernel: 7
-Min W/H: 24
-Base%: 35
-Margen X%: 4
-```
+## 5. Merge de manuales
 
-### Terraria (mucho detalle, texturas)
-```
-Modo: 2
-Blur: 7
-Canny Low: 40
-Canny High: 130
-Kernel: 9
-Min W/H: 20
-Base%: 45
-Margen X%: 5
-```
+`m` fusiona solo rectangulos del mismo tipo y solo para tipos habilitados.
 
-### Top-Down RPG (Ocarina of Time style)
-```
-Modo: 2
-Blur: 5
-Canny Low: 30
-Canny High: 100
-Kernel: 7
-Min W/H: 24
-Base%: 40
-Margen X%: 5
-```
+Toggles de merge:
 
-## 4. Personalizar rangos HSV por tipo
+- `k`: `solido`
+- `l`: `agua`
+- `b`: `tejado`
+- `r`: `vegetacion`
 
-### Editar en el código (líneas 14-42):
+Presets:
 
-```python
-HYBRID_HSV_RANGES = [
-    {
-        "type": "agua",
-        "h_min": 80,      # ← Cambiar si el agua es más azul (90) o más verde (60)
-        "h_max": 130,
-        "s_min": 40,      # ← Si el agua es pálida, reducir a 0-20
-        "s_max": 255,
-        "v_min": 20,      # ← Agua oscura: 50-80; agua clara: 0-30
-        "v_max": 255,
-    },
-    # ... más tipos
-]
-```
+- `5`: solo `solido`
+- `6`: solo `agua`
+- `7`: todos
 
-### Referencia HSV (Hue de 0-179 en OpenCV):
+Notas:
 
-| Color | H (rango) | Ejemplo |
-|-------|-----------|---------|
-| Rojo | 0, 175-179 | Tejados, flores |
-| Naranja | 10-20 | Madera, fuego |
-| Amarillo | 20-35 | Oro, flores |
-| Verde | 35-90 | Vegetación, hierba |
-| Cyan | 90-110 | Agua clara |
-| Azul | 110-130 | Agua oscura |
-| Magenta | 130-179 | Raramente usado |
+- Criterio de fusion: interseccion > 0 o IoU >= 0.2.
+- Al guardar (`s` o boton) tambien se ejecuta merge de manuales.
 
-## 5. Exportar datos y usar en motor
+## 6. Exportacion
 
-### JSON generado
+Al guardar se solicitan 2 archivos:
+
+1. Imagen resultado (`.png`, `.jpg`, `.jpeg`, `.webp`)
+2. JSON resultado (`.json`)
+
+Estructura de salida:
 
 ```json
 {
   "colisiones": [
-    { "x": 150, "y": 200, "width": 48, "height": 16, "type": "solido" },
-    { "x": 300, "y": 150, "width": 32, "height": 24, "type": "agua" }
+    { "x": 10, "y": 20, "width": 30, "height": 12, "type": "solido" }
   ],
   "por_tipo": {
-    "solido": [ ... ],
-    "agua": [ ... ],
-    "tejado": [ ... ],
-    "vegetacion": [ ... ]
+    "solido": [],
+    "agua": [],
+    "tejado": [],
+    "vegetacion": []
   }
 }
 ```
 
-### Usar en Python (ejemplo muy básico):
+## 7. Parametros internos relevantes
 
-```python
-import json
+- Deduplicacion en modo hibrido: IoU `0.55`.
+- Contornos: `RETR_EXTERNAL` + `CHAIN_APPROX_SIMPLE`.
+- `Canny High` se fuerza a ser mayor que `Canny Low`.
+- `Blur` y `Kernel` se fuerzan a impar.
 
-with open("datos_colisiones_rpg_hibrido.json") as f:
-    data = json.load(f)
+## 8. Sugerencias para motores de juego
 
-# Acceder a todas las colisiones
-for col in data["colisiones"]:
-    x, y, w, h = col["x"], col["y"], col["width"], col["height"]
-    tipo = col["type"]
-    print(f"Obstáculo {tipo} en ({x}, {y}) - {w}x{h}")
+- Usa `por_tipo` para capas de colision diferenciadas.
+- Trata `agua` como zona de movimiento restringido o efecto.
+- Trata `tejado` como capa de ocultacion/altura si aplica.
+- Mantiene `solido` para bloqueo duro.
 
-# O acceder por tipo
-agua_colisiones = data["por_tipo"].get("agua", [])
-print(f"Total obstáculos de agua: {len(agua_colisiones)}")
-```
+## 9. Estrategia recomendada de calibracion
 
-### Usar en C#/.NET (motor Godot/monogame/etc):
-
-```csharp
-using System.Collections.Generic;
-using Newtonsoft.Json;
-
-public class CollisionData
-{
-    public List<Collision> colisiones { get; set; }
-    public Dictionary<string, List<Collision>> por_tipo { get; set; }
-}
-
-public class Collision
-{
-    public int x { get; set; }
-    public int y { get; set; }
-    public int width { get; set; }
-    public int height { get; set; }
-    public string type { get; set; }
-}
-
-// Cargar
-string json = File.ReadAllText("datos_colisiones_rpg_hibrido.json");
-var data = JsonConvert.DeserializeObject<CollisionData>(json);
-
-// Usar
-foreach (var col in data.colisiones)
-{
-    if (col.type == "solido")
-        CreateWall(col.x, col.y, col.width, col.height);
-}
-```
-
-## 6. Tip: Combinar múltiples capas
-
-Si tu mapa tiene múltiples capas (agua debajo, suelo, objetos, cielo), exporta cada capa por separado:
-
-1. Carga capa de agua
-2. Modo HSV, ajusta rangos para agua
-3. Pulsa s → `datos_colisiones_rpg_agua.json`
-4. Carga capa de objetos
-5. Modo Bordes, ajusta Canny
-6. Pulsa g → guarda perfil como "objetos"
-7. Pulsa s → `datos_colisiones_rpg_bordes.json`
-
-Luego fusiona los JSONs en el motor.
-
-## 7. Debugging avanzado
-
-### Ver solo la máscara binaria
-
-En el panel derecho de la ventana, ves la máscara blanca/negra. Usa eso para:
-
-- **Blanco**: Detectado como obstáculo
-- **Negro**: Fondo seguro
-
-Si hay ruido blanco pequeño → aumenta Canny Low.
-Si faltan obstáculos → reduce Canny Low.
-
-### Verificar overlaps
-
-Usa toggles (A/T/V/O) para ver si hay:
-- Agua detectada donde no debería (ajusta H_min/H_max de agua)
-- Sólidos sin detectar (ajusta Canny)
-- Tipos superpuestos (edita rangos para que no se solapen)
-
----
-
-**¡Listo para personalizaciones!** 🎨
-
-Cualquier duda, experimenta con los sliders en tiempo real y guarda perfiles distintos para comparar.
+1. Ajusta primero bordes (`Blur`, `Canny`, `Kernel`) hasta estabilizar `solido`.
+2. Ajusta luego los tipos HSV (`a/t/v` + `H2/S2/V2` + `u`).
+3. Corrige excepciones con manuales (mouse + `Manual X/Y/W/H`).
+4. Aplica merge segun tipo (`m` y toggles `k/l/b/r`).
+5. Exporta y valida en motor antes de guardar `custom`.

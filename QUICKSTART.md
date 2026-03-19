@@ -1,60 +1,66 @@
-# Quick Start (30 segundos) ⚡
+# Quick Start (1 minuto)
 
-## Instalación
+## 1. Instalar dependencias
+
 ```bash
 pip install opencv-python numpy
 ```
 
-## Uso básico
+## 2. Ejecutar
 
-1. **Coloca tu imagen** en la carpeta del script como `fondo1.png`
-
-2. **Ejecuta:**
 ```bash
 python generar_colisiones.py
 ```
 
-3. **En la ventana:**
-   - Pulsa **1** → carga perfil "bosque"
-   - Mueve sliders hasta que veas bien en la máscara (panel derecho)
-   - Pulsa **A/T/V/O** para ver/ocultar tipos
-   - Pulsa **s** → copia colisiones a JSON
-   - Pulsa **q** → listo!
+Se abrira un selector para elegir la imagen.
 
-4. **Archivos generados:**
-   - `mapa_con_colisiones_rpg_hibrido.jpg` ← preview
-   - `datos_colisiones_rpg_hibrido.json` ← usa esto en tu motor
+## 3. Calibrar rapido
 
----
+1. Pulsa `2` para empezar con perfil `ciudad` (suele ser estable).
+2. Ajusta `Blur`, `Canny Low/High`, `Kernel`.
+3. Verifica mascara en panel derecho.
+4. Si usas hibrido, edita tipos con `a/t/v` y sliders `H2/S2/V2`.
+5. Pulsa `u` para aplicar esos rangos al tipo activo.
 
-## Atajos clave
+## 4. Corregir manualmente (si hace falta)
 
-| Tecla | Qué hace |
-|-------|----------|
-| **1/2/3/4** | Cargar perfil (bosque/ciudad/costa/custom) |
-| **g** | Guardar configuración actual |
-| **s** | Exportar JSON + preview |
-| **a/t/v** | Cambiar tipo HSV a editar (agua/tejado/vegetacion) |
-| **A/T/V/O** | Toggle mostrar/ocultar tipos |
-| **q** | Salir |
+- Dibuja con click izquierdo + arrastre.
+- Mueve con click izquierdo sobre rectangulo.
+- Redimensiona desde esquina inferior derecha.
+- Borra con click derecho o con `x` si esta seleccionado.
 
----
+## 5. Exportar
 
-## Si la detección falla
+- Pulsa `s` o click en boton `GUARDAR`.
+- Elige ruta para imagen y para JSON.
 
-**Muchos obstáculos no aparecen:**
-- Sube Blur a 5-7
-- Baja Canny Low a 20-35
+## 6. Guardar perfil
 
-**Mucho ruido:**
-- Baja Blur a 3
-- Sube Canny Low a 50+
+- Pulsa `g` para guardar la configuracion actual como `custom`.
+- Pulsa `4` para cargar `custom` en futuras sesiones.
 
-**Objetos fragmentados:**
-- Sube Kernel a 7-9
+## Checklist final
+
+- La mascara del panel derecho representa bien lo que quieres bloquear.
+- Revisaste visibilidad por tipo con `A/T/V/O`.
+- Ajustaste o corregiste manuales si hacia falta.
+- Exportaste imagen y JSON con `s`.
 
 ---
 
-**Documentación completa:** Ver `README_colisiones_rpg.md`
+## Atajos esenciales
 
-**Configuraciones avanzadas:** Ver `ADVANCED_CONFIG.md`
+- `1/2/3/4`: cargar `bosque/ciudad/costa/custom`.
+- `A/T/V/O`: mostrar u ocultar tipos.
+- `m`: fusionar manuales segun tipos habilitados.
+- `k/l/b/r`: toggles merge `solido/agua/tejado/vegetacion`.
+- `5/6/7`: presets de merge.
+- `q` o `ESC`: salir.
+
+---
+
+## Archivos utiles
+
+- README completo: `README_colisiones_rpg.md`
+- Ajustes avanzados: `ADVANCED_CONFIG.md`
+- Atajos en formato rapido: `CHEATSHEET.txt`

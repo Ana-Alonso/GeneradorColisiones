@@ -1,273 +1,181 @@
-# Extractor de Colisiones RPG Top-Down 🎮
+# Extractor de Colisiones RPG Top-Down
 
-Script interactivo de Python con OpenCV para extraer cajas de colisión de mapas 2D pixel art con depuración visual en tiempo real.
+Script interactivo en Python + OpenCV para generar colisiones de mapas 2D con depuracion visual en tiempo real (preview + mascara).
 
-## Características principales
+## Resumen funcional
 
-✅ **3 modos de detección:**
-- Modo 0: Detección por bordes (Canny + morfología)
-- Modo 1: Segmentación HSV (selección manual de color)
-- Modo 2: Híbrido automático (Bordes + HSV por tipos: agua/tejado/vegetacion)
+- 3 modos de deteccion:
+  - Modo 0: bordes (Canny + cierre morfologico).
+  - Modo 1: HSV (segmentacion por rango de color).
+  - Modo 2: hibrido (solidos por bordes + tipos HSV por rango).
+- Tipos de colision soportados:
+  - `solido`, `agua`, `tejado`, `vegetacion`.
+- Editor manual integrado:
+  - Dibujar, mover, redimensionar, borrar y editar por trackbars.
+- Fusion de rectangulos manuales por tipo (con toggles por tipo).
+- Perfiles persistentes en `perfiles_colisiones_rpg.json`.
+- Guardado con selector de rutas (imagen + JSON).
 
-✅ **Controles interactivos:** Sliders en vivo para ajustar Blur, Canny, Kernel, HSV y filtros de tamaño.
+## Requisitos
 
-✅ **Perfiles guardables:** Bosque, Ciudad, Costa y Custom en formato JSON.
+- Python 3.8+
+- opencv-python
+- numpy
 
-✅ **Edición de tipos HSV:** Ajusta rangos de agua/tejado/vegetacion sin editar código.
+Instalacion:
 
-✅ **Toggles de visibilidad:** Muestra/oculta tipos individuales para depuración rápida.
+```bash
+pip install opencv-python numpy
+```
 
-✅ **Exportación etiquetada:** JSON con colisiones agrupadas por tipo + imagen preview.
+## Ejecucion
 
----
-
-## Instalación
-
-### Requisitos previos
-- Python 3.7+
-- OpenCV: `pip install opencv-python`
-- NumPy: `pip install numpy`
-
-### Configuración
-1. Coloca tu imagen de mapa en la misma carpeta que el script, llamada `fondo1.png` (o edita la línea final del script).
-2. Ejecuta desde terminal:
 ```bash
 python generar_colisiones.py
 ```
 
----
+Al ejecutar, el script abre un selector de archivo para elegir la imagen.
 
-## Controles
+Formatos de entrada permitidos:
 
-### Atajos principales
+- `.jpg`, `.jpeg`, `.png`, `.webp`, `.web`
 
-| Tecla | Función |
-|-------|---------|
-| **s** | Guardar JSON + imagen preview |
-| **q** / **ESC** | Salir |
-| **g** | Guardar perfil actual como `custom` |
-| **1/2/3/4** | Cargar perfil bosque/ciudad/costa/custom |
+## Flujo recomendado
 
-### Edición de tipos HSV (modo híbrido)
+1. Carga una imagen.
+2. Pulsa `1`, `2` o `3` para cargar perfil base (`bosque`, `ciudad`, `costa`).
+3. Ajusta sliders hasta limpiar la mascara del panel derecho.
+4. Si hace falta, agrega/retoca colisiones manuales con mouse.
+5. Pulsa `s` o boton `GUARDAR` para exportar.
+6. Si quieres guardar la calibracion, pulsa `g` para actualizar perfil `custom`.
 
-| Tecla | Función |
-|-------|---------|
-| **a** | Seleccionar tipo agua |
-| **t** | Seleccionar tipo tejado |
-| **v** | Seleccionar tipo vegetacion |
-| **u** | Aplicar sliders H2/S2/V2 al tipo seleccionado |
+## Controles de teclado
 
-### Toggles de visibilidad
+### General
 
-| Tecla | Función |
-|-------|---------|
-| **A** (mayúscula) | Toggle agua on/off |
-| **T** (mayúscula) | Toggle tejado on/off |
-| **V** (mayúscula) | Toggle vegetacion on/off |
-| **O** (mayúscula) | Toggle solidos on/off |
+- `q` o `ESC`: salir.
+- `s`: abrir dialogos para guardar imagen + JSON.
+- `g`: guardar configuracion actual como perfil `custom`.
+- `1/2/3/4`: cargar `bosque/ciudad/costa/custom`.
 
-### Sliders en la ventana
+### Tipos HSV (modo hibrido)
 
-- **Modo** (0-2): Selecciona modo de detección
-- **Blur (impar)**: Tamaño de desenfoque (1-31)
-- **Canny Low/High**: Umbrales de detección de bordes (0-255)
-- **Kernel (impar)**: Tamaño de kernel morfológico (1-31)
-- **H/S/V min/max**: Rangos HSV para modo 1
-- **H2/S2/V2 min/max**: Rangos HSV para tipo activo en modo híbrido
-- **Min W/H**: Tamaño mínimo de caja (píxeles)
-- **Max W%/H%**: Tamaño máximo de caja (% de imagen)
-- **Base%**: Altura de colisión respecto al objeto (% de altura del objeto)
-- **Margen X%**: Margen lateral para ajustar ancho (%)
+- `a`: tipo activo `agua`.
+- `t`: tipo activo `tejado`.
+- `v`: tipo activo `vegetacion`.
+- `u`: aplicar sliders `H2/S2/V2` al tipo activo.
 
----
+### Tipo manual
 
-## Flujo de trabajo típico
+- `o`: tipo manual `solido`.
+- `a/t/v`: tambien cambian tipo manual a `agua/tejado/vegetacion`.
 
-### Paso 1: Cargar y calibrar
-1. Ejecuta el script con tu imagen.
-2. Carga un perfil inicial (tecla 1/2/3) según el tipo de mapa.
-3. Ajusta Blur, Canny y Kernel hasta que veas bien los obstáculos en la máscara binaria (panel derecho).
+### Visibilidad por tipo
 
-### Paso 2: Depurar con toggles
-1. Pulsa **A/T/V/O** para activar/desactivar tipos individuales.
-2. Verifica que solo ves las colisiones que querés.
-3. Si un tipo falla, sigue al paso 3.
+- `A`: mostrar/ocultar `agua`.
+- `T`: mostrar/ocultar `tejado`.
+- `V`: mostrar/ocultar `vegetacion`.
+- `O`: mostrar/ocultar `solido`.
 
-### Paso 3: Afinar rangos HSV (modo híbrido)
-1. Pulsa **a** (agua), **t** (tejado) o **v** (vegetacion) para seleccionar tipo.
-2. Ajusta sliders H2/S2/V2 en la ventana para refinar la detección.
-3. Pulsa **u** para aplicar cambios.
+### Rectangulos manuales
 
-### Paso 4: Guardar perfil
-1. Una vez satisfecho, pulsa **g** para guardar como `custom`.
-2. El perfil se guarda en `perfiles_colisiones_rpg.json`.
+- Click izquierdo + arrastrar: crear rectangulo.
+- Click izquierdo sobre rectangulo: seleccionar y mover.
+- Arrastrar esquina inferior derecha: redimensionar.
+- Click derecho sobre rectangulo: borrar.
+- `n/p`: siguiente/anterior rectangulo manual.
+- `x`: borrar rectangulo seleccionado.
+- `z`: deshacer ultimo rectangulo creado.
+- `c`: limpiar todos los rectangulos manuales.
 
-### Paso 5: Exportar
-1. Pulsa **s** para guardar:
-   - `mapa_con_colisiones_rpg_hibrido.jpg` (preview con cajas)
-   - `datos_colisiones_rpg_hibrido.json` (colisiones etiquetadas)
+### Fusion de manuales
 
----
+- `m`: fusionar manuales solapados del mismo tipo.
+- `k/l/b/r`: activar/desactivar merge para `solido/agua/tejado/vegetacion`.
+- `5`: preset merge solo `solido`.
+- `6`: preset merge solo `agua`.
+- `7`: preset merge todos los tipos.
 
-## Estructura del JSON exportado
+## Trackbars disponibles
+
+- `Modo (0 Bordes, 1 HSV, 2 Hibrido)`.
+- `Blur (impar)`, `Canny Low`, `Canny High`, `Kernel (impar)`.
+- `H min/max`, `S min/max`, `V min/max` (modo HSV global).
+- `H2 min/max`, `S2 min/max`, `V2 min/max` (tipo HSV activo en hibrido).
+- `Min W`, `Min H`, `Max W %`, `Max H %`.
+- `Base %`, `Margen X %`.
+- `Manual X`, `Manual Y`, `Manual W`, `Manual H` (rectangulo seleccionado).
+
+## Archivos de salida
+
+Al guardar, el script pide rutas para:
+
+- Imagen con preview y cajas dibujadas (`.png`, `.jpg`, `.jpeg`, `.webp`).
+- JSON con colisiones.
+
+Estructura JSON:
 
 ```json
 {
   "colisiones": [
-    {
-      "x": 100,
-      "y": 150,
-      "width": 50,
-      "height": 20,
-      "type": "solido"
-    },
-    {
-      "x": 200,
-      "y": 80,
-      "width": 60,
-      "height": 25,
-      "type": "agua"
-    }
+    { "x": 100, "y": 150, "width": 50, "height": 20, "type": "solido" },
+    { "x": 200, "y": 80, "width": 60, "height": 25, "type": "agua" }
   ],
   "por_tipo": {
-    "solido": [...],
-    "agua": [...],
-    "tejado": [...],
-    "vegetacion": [...]
+    "solido": [],
+    "agua": [],
+    "tejado": [],
+    "vegetacion": []
   }
 }
 ```
 
----
+## Perfiles
 
-## Perfiles disponibles
+Perfiles por defecto:
 
-### Bosque
-- Optimizado para mapas con vegetación densa y sombras.
-- Kernel pequeño (5) para detalles finos.
+- `bosque`
+- `ciudad`
+- `costa`
 
-### Ciudad
-- Enfocado en estructuras rectangulares (edificios).
-- Kernel más grande (7) para agrupar detalles.
+Perfil editable:
 
-### Costa
-- Especializado en agua y playas.
-- Rangos HSV preajustados para agua azul.
+- `custom` (se guarda con `g`).
 
-### Custom
-- Se guarda con tu configuración actual.
-- Pulsa **g** en cualquier momento para actualizar.
+Archivo de perfiles:
 
----
+- `perfiles_colisiones_rpg.json` en la misma carpeta de la imagen abierta.
 
-## Rangos HSV por defecto para modo híbrido
+## Notas de deteccion
 
-| Tipo | H_min | H_max | S_min | S_max | V_min | V_max |
-|------|-------|-------|-------|-------|-------|-------|
-| Agua | 80 | 130 | 40 | 255 | 20 | 255 |
-| Tejado | 0 | 25 | 50 | 255 | 40 | 255 |
-| Vegetacion | 35 | 90 | 35 | 255 | 20 | 255 |
+- `Base %` controla cuanto ocupa la colision en la base del objeto.
+- `Margen X %` recorta lateralmente la caja de colision.
+- El modo hibrido deduplica colisiones automaticas con IoU 0.55.
+- Los manuales se fusionan por interseccion o IoU (0.2) cuando ejecutas `m` o al guardar.
 
-**Modificar en código:** Edita la sección `HYBRID_HSV_RANGES` al inicio del script.
+## Troubleshooting rapido
 
----
+- No detecta casi nada:
+  - Baja `Canny Low` (20-35) y/o `Min W/H`.
+  - Revisa visibilidad por tipo (A/T/V/O).
+- Hay mucho ruido:
+  - Sube `Canny Low` y `Kernel`.
+  - Ajusta `Blur` en rango 3-7.
+- Agua/tejado/vegetacion salen mal:
+  - Selecciona tipo (`a/t/v`) y ajusta sliders `H2/S2/V2`.
+  - Pulsa `u` para aplicar.
+- El rectangulo seleccionado se mueve raro:
+  - Ajusta numericamente con `Manual X/Y/W/H`.
 
-## Recomendaciones para pixel art
+## Recomendacion de uso
 
-### Blur
-- Pixel art fino: 3-5
-- Pixel art grueso: 5-7
-- Demasiado alto: pierde detalles
+- Usa `1/2/3` para empezar desde un perfil base antes de calibrar.
+- Guarda en `custom` con `g` cuando encuentres una configuracion estable.
+- Exporta varias veces durante el ajuste para validar el JSON en tu motor.
 
-### Canny Low/High
-- Conservador: 20-50 / 70-120
-- Agresivo: 10-30 / 60-100
-- Diferencia mínima recomendada: 50 unidades
+## Dependencias
 
-### Kernel
-- Impar requerido: 1, 3, 5, 7, 9...
-- Valores bajos mantienen precisión
-- Valores altos unifican objetos cercanos
-
-### Filtros de tamaño
-- **Min W/H:** Evita flores, torches, etc. Empieza en 18-24.
-- **Max %:** 85-95 para evitar capturar la capa de fondo completa.
-
----
-
-## Troubleshooting
-
-### "No se detectan obstáculos"
-1. Sube Canny Low (reduce a 20-35).
-2. Aumenta Blur un poco (5-7).
-3. Verifica que el tipo está activado (toggle en ON).
-
-### "Demasiado ruido en la máscara"
-1. Baja Canny Low (aumenta a 50+).
-2. Sube Kernel (7-9).
-3. Reduce Blur si está muy alto.
-
-### "Colisiones fragmentadas en varios rectángulos"
-1. Aumenta Kernel para unir fragmentos.
-2. Reduce Canny High (diferencia mayor con Low).
-
-### "Custom no se guarda"
-1. Verifica que la carpeta de `fondo1.png` tiene permisos de escritura.
-2. Revisa la terminal para mensajes de error.
-3. El archivo se guarda como `perfiles_colisiones_rpg.json`.
-
----
-
-## Ejemplo de uso rápido
-
-```bash
-# 1. Ejecutar
-python generar_colisiones.py
-
-# 2. En la ventana de OpenCV:
-# - Pulsa 2 para cargar perfil "ciudad"
-# - Mueve slider Blur hasta ver bien obstáculos
-# - Pulsa A/T/V/O para probar toggles
-# - Pulsa s para guardar
-# - Pulsa q para salir
-```
-
-**Resultado:** Archivos `mapa_con_colisiones_rpg_hibrido.jpg` y `datos_colisiones_rpg_hibrido.json` en la misma carpeta.
-
----
-
-## Colores en la preview
-
-| Color | Significado |
-|-------|-----------|
-| Azul claro | Contorno visual del objeto |
-| Rojo | Caja de colisión (solido) |
-| Amarillo | Caja de colisión (agua) |
-| Cyan | Caja de colisión (tejado) |
-| Verde | Caja de colisión (vegetacion) |
-| Blanco (derecha) | Máscara binaria de detección |
-
----
-
-## Notas técnicas
-
-- **IoU Threshold:** 0.55 para deduplicación de cajas en modo híbrido.
-- **Contornos:** RETR_EXTERNAL + CHAIN_APPROX_SIMPLE.
-- **Base de colisión:** Por defecto 40% inferior (editable con slider Base%).
-- **Margen X:** Por defecto 5% (editable con slider Margen X%).
-
----
-
-## Licencia y créditos
-
-Script desarrollado con especialización en visión artificial para RPG top-down en pixel art.
-
-Basado en librerías:
-- OpenCV (cv2)
+- OpenCV (`cv2`)
 - NumPy
-- JSON (estándar Python)
-
----
-
-**¿Preguntas o mejoras?** El script está diseñado para ser modificable. 
-Edita `HYBRID_HSV_RANGES`, `DEFAULT_PROFILES` o funciones de detección según tus necesidades. 🚀
+- Tkinter (dialogos de abrir/guardar)
+- JSON/os/copy (stdlib)

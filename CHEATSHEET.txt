@@ -1,144 +1,106 @@
-# 🎮 CHEAT SHEET - Atajos de teclado
+EXTRACTOR DE COLISIONES RPG - CHEAT SHEET
+==========================================
 
-```
-╔════════════════════════════════════════════════════════════════════╗
-║         EXTRACTOR DE COLISIONES RPG - ATAJOS RÁPIDOS              ║
-╚════════════════════════════════════════════════════════════════════╝
+USO RAPIDO
+----------
+1) Carga perfil con 1/2/3
+2) Ajusta sliders principales
+3) Revisa tipos con A/T/V/O
+4) Corrige manuales si hace falta
+5) Exporta con s
 
-┌─ CARGAR PERFILES ────────────────────────────────────────────────┐
-│ 1  → Bosque           (especializado vegetación)                   │
-│ 2  → Ciudad           (edificios/estructuras)                      │
-│ 3  → Costa            (agua/playas)                                │
-│ 4  → Custom           (tu configuración guardada)                  │
-└──────────────────────────────────────────────────────────────────┘
+EJECUCION
+---------
+python generar_colisiones.py
 
-┌─ GUARDAR / EXPORTAR ─────────────────────────────────────────────┐
-│ G  → Guardar perfil actual como "custom"                          │
-│ S  → Exportar JSON + imagen preview                               │
-└──────────────────────────────────────────────────────────────────┘
+El script abre selector de imagen al iniciar.
 
-┌─ TIPO HSV HÍBRIDO (a / t / v) ───────────────────────────────────┐
-│ A  → Editar rango de AGUA       (sliders H2/S2/V2)                │
-│ T  → Editar rango de TEJADO     (sliders H2/S2/V2)                │
-│ V  → Editar rango de VEGETACION (sliders H2/S2/V2)                │
-│ U  → Aplicar cambios al tipo seleccionado                         │
-└──────────────────────────────────────────────────────────────────┘
+PERFILES
+--------
+1 -> bosque
+2 -> ciudad
+3 -> costa
+4 -> custom
+G -> guardar estado actual en perfil custom
 
-┌─ TOGGLES DE VISIBILIDAD (MAYÚSCULAS) ────────────────────────────┐
-│ SHIFT+A  → Toggle AGUA on/off      (Amarillo en preview)          │
-│ SHIFT+T  → Toggle TEJADO on/off    (Cyan en preview)              │
-│ SHIFT+V  → Toggle VEGETACION on/off (Verde en preview)            │
-│ SHIFT+O  → Toggle SOLIDOS on/off   (Rojo en preview)              │
-└──────────────────────────────────────────────────────────────────┘
+MODOS
+-----
+Trackbar "Modo":
+0 -> bordes
+1 -> hsv
+2 -> hibrido
 
-┌─ SALIR ──────────────────────────────────────────────────────────┐
-│ Q    → Salir                                                       │
-│ ESC  → Salir                                                       │
-└──────────────────────────────────────────────────────────────────┘
+TIPO HSV ACTIVO (HIBRIDO)
+-------------------------
+a -> agua
+t -> tejado
+v -> vegetacion
+u -> aplicar H2/S2/V2 al tipo activo
 
-╔════════════════════════════════════════════════════════════════════╗
-║                        SLIDERS (Ventana)                           ║
-╚════════════════════════════════════════════════════════════════════╝
+TIPO MANUAL
+-----------
+o -> solido
+a/t/v -> tambien cambian tipo manual (agua/tejado/vegetacion)
 
-Modo de detección:
-  0 = Bordes (Canny + morfología)
-  1 = HSV manual (color)
-  2 = Híbrido (bordes + HSV por tipos)
+VISIBILIDAD POR TIPO
+--------------------
+A -> toggle agua
+T -> toggle tejado
+V -> toggle vegetacion
+O -> toggle solido
 
-BLUR (impar): 1-31
-  Bajo (3-5):  Mantiene detalles
-  Alto (7-9):  Reduce ruido
+RECTANGULOS MANUALES
+--------------------
+Mouse izquierdo + arrastrar: crear
+Mouse izquierdo sobre rectangulo: seleccionar/mover
+Arrastrar esquina inferior derecha: redimensionar
+Mouse derecho sobre rectangulo: borrar
 
-CANNY Low/High: 0-255
-  Diferencia mínima: ~50 puntos
-  Bajo Low (20):     Detecta más (menos filtrado)
-  Alto Low (60):     Detecta menos (filtrado fuerte)
+n -> seleccionar siguiente
+p -> seleccionar anterior
+x -> borrar seleccionado
+z -> deshacer ultimo
+c -> limpiar todos
 
-KERNEL (impar): 1-31
-  Bajo (3-5):  Preserva detalles
-  Alto (7-9):  Une fragmentos
+Trackbars manuales del seleccionado:
+Manual X, Manual Y, Manual W, Manual H
 
-Min W/H: Tamaño mínimo en píxeles
-  Para pixel art: 16-32
+MERGE MANUAL
+------------
+m -> fusionar manuales solapados (mismo tipo)
 
-Max W%/H%: Tamaño máximo como % de imagen
-  Típico: 85-95%
+Toggles merge por tipo:
+k -> solido
+l -> agua
+b -> tejado
+r -> vegetacion
 
-Base%: Altura de colisión (% de altura del objeto)
-  RPG Top-Down: 35-45%
+Presets merge:
+5 -> solo solido
+6 -> solo agua
+7 -> todos
 
-Margen X%: Margen lateral (% del ancho)
-  Típico: 4-8%
+GUARDAR Y SALIR
+---------------
+s -> guardar (abre dialogos imagen + json)
+Boton GUARDAR en la imagen -> igual que s
+q o ESC -> salir
 
-╔════════════════════════════════════════════════════════════════════╗
-║                        COLORES EN PREVIEW                         ║
-╚════════════════════════════════════════════════════════════════════╝
+SLIDERS CLAVE
+-------------
+Blur (impar)
+Canny Low / Canny High
+Kernel (impar)
+H/S/V min/max
+H2/S2/V2 min/max
+Min W, Min H
+Max W %, Max H %
+Base %
+Margen X %
 
-AZUL CLARO  = Contorno visual del objeto detectado
-ROJO        = Caja de colisión tipo SOLIDO
-AMARILLO    = Caja de colisión tipo AGUA
-CYAN        = Caja de colisión tipo TEJADO
-VERDE       = Caja de colisión tipo VEGETACION
-
-BLANCO (right panel) = Máscara binaria (blanco=detectado)
-
-╔════════════════════════════════════════════════════════════════════╗
-║                         FLUJO TÍPICO                              ║
-╚════════════════════════════════════════════════════════════════════╝
-
-1. Ejecuta: python generar_colisiones.py
-2. Presiona 2 (carga "ciudad" como base)
-3. Ajusta Blur hasta ver bien en máscara derecha
-4. Presiona A/T/V/O para verificar cada tipo
-5. Si algo falla: edita tipo con a/t/v y sliders H2/S2/V2, luego U
-6. Presiona G para guardar tu configuración
-7. Presiona S para exportar archivos
-8. Presiona Q para salir
-
-╔════════════════════════════════════════════════════════════════════╗
-║                    SOLUCIÓN DE PROBLEMAS                          ║
-╚════════════════════════════════════════════════════════════════════╝
-
-❌ No detecta nada
-   → Sube Blur a 5-7
-   → Baja Canny Low a 20-35
-
-❌ Demasiado ruido
-   → Baja Blur a 3
-   → Sube Canny Low a 50+
-
-❌ Objetos fragmentados
-   → Sube Kernel a 7-9
-   → Aumenta Min W/H
-
-❌ Agua/tipos mal detectados
-   → Pulsa A/T/V para editar
-   → Ajusta H2 min/max (tonalidad)
-   → Pulsa U para aplicar
-
-✅ Para guardar y continuar después
-   → Presiona G (guarda como custom)
-   → Presiona 4 para cargar custom la próxima vez
-
-╔════════════════════════════════════════════════════════════════════╗
-║               ARCHIVOS GENERADOS AL EXPORTAR (S)                  ║
-╚════════════════════════════════════════════════════════════════════╝
-
-mapa_con_colisiones_rpg_MODO.jpg
-  → Imagen preview con cajas dibujadas
-  → Úsala para verificar visualmente
-
-datos_colisiones_rpg_MODO.json
-  → JSON estructurado por tipo
-  → Importa en tu motor de juego
-
-perfiles_colisiones_rpg.json
-  → Perfiles guardados con G
-  → Cargados con 1/2/3/4
-
-```
-
----
-
-**Imprime esto o ponlo al lado del monitor mientras usas el script!** 📋
-
+TIPS RAPIDOS
+------------
+No detecta: baja Canny Low, revisa toggles de visibilidad.
+Mucho ruido: sube Canny Low o Kernel.
+Fragmentacion: sube Kernel.
+Tipo hsv incorrecto: selecciona a/t/v, ajusta H2/S2/V2, pulsa u.
