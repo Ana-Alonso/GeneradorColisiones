@@ -11,6 +11,7 @@ import numpy as np
 WINDOW_NAME = "Colisiones RPG - Debug"
 PROFILE_FILE = "perfiles_colisiones_rpg.json"
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".web"}
+ALLOWED_SAVE_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 # Presets iniciales para modo híbrido. Ajusta estos rangos a tu paleta real.
 HYBRID_HSV_RANGES = [
@@ -430,9 +431,11 @@ def dibujar_resultado(img, cajas_visuales, colisiones):
     return out
 
 
-def guardar_salida(output_img, colisiones, prefijo="rpg"):
-    imagen_salida = f"mapa_con_colisiones_{prefijo}.jpg"
-    json_salida = f"datos_colisiones_{prefijo}.json"
+def guardar_salida(output_img, colisiones, prefijo="rpg", imagen_salida=None, json_salida=None):
+    if not imagen_salida:
+        imagen_salida = f"mapa_con_colisiones_{prefijo}.jpg"
+    if not json_salida:
+        json_salida = f"datos_colisiones_{prefijo}.json"
 
     cv2.imwrite(imagen_salida, output_img)
     por_tipo = {}
@@ -454,6 +457,54 @@ def guardar_salida(output_img, colisiones, prefijo="rpg"):
     print(f"Guardado: {imagen_salida}")
     print(f"Guardado: {json_salida}")
     print(f"Total colisiones: {len(colisiones)}")
+
+
+def seleccionar_rutas_guardado(ruta_imagen, prefijo="rpg"):
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+
+    base_dir = os.path.dirname(os.path.abspath(ruta_imagen))
+    base_name = os.path.splitext(os.path.basename(ruta_imagen))[0]
+
+    imagen_salida = filedialog.asksaveasfilename(
+        title="Guardar mapa con colisiones",
+        initialdir=base_dir,
+        initialfile=f"{base_name}_colisiones_{prefijo}.png",
+        defaultextension=".png",
+        filetypes=[
+            ("Imagen PNG", "*.png"),
+            ("Imagen JPG", "*.jpg;*.jpeg"),
+            ("Imagen WEBP", "*.webp"),
+        ],
+    )
+
+    if not imagen_salida:
+        root.destroy()
+        print("Guardado cancelado: no se selecciono ruta para la imagen.")
+        return None, None
+
+    ext = os.path.splitext(imagen_salida)[1].lower()
+    if ext not in ALLOWED_SAVE_IMAGE_EXTENSIONS:
+        root.destroy()
+        print("Formato de salida de imagen no valido. Usa: jpg, jpeg, png o webp.")
+        return None, None
+
+    json_salida = filedialog.asksaveasfilename(
+        title="Guardar datos de colisiones JSON",
+        initialdir=os.path.dirname(imagen_salida),
+        initialfile=f"{base_name}_colisiones_{prefijo}.json",
+        defaultextension=".json",
+        filetypes=[("Archivo JSON", "*.json")],
+    )
+
+    root.destroy()
+
+    if not json_salida:
+        print("Guardado cancelado: no se selecciono ruta para el JSON.")
+        return None, None
+
+    return imagen_salida, json_salida
 
 
 def crear_trackbars():
@@ -555,6 +606,72 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
     hybrid_hsv_ranges = deepcopy(HYBRID_HSV_RANGES)
     tipos_hibridos = ["agua", "tejado", "vegetacion"]
     tipo_hibrido_activo = "agua"
+
+    img_h, img_w = img.shape[:2]
+    button_rect = (max(10, img_w - 190), 10, max(160, img_w - 20), 48)
+
+    ui_state = {
+        "drawing": False,
+        "start": (0, 0),
+        "current": (0, 0),
+        "manual_type": "solido",
+        "manual_rects": [],
+        "save_requested": False,
+    }
+
+    color_por_tipo = {
+        "solido": (0, 0, 255),
+        "agua": (255, 255, 0),
+        "tejado": (0, 165, 255),
+        "vegetacion": (0, 255, 0),
+    }
+
+    def clamp_point(x, y):
+        return max(0, min(img_w - 1, x)), max(0, min(img_h - 1, y))
+
+    def on_mouse(event, x, y, _flags, _param):
+        if x >= img_w or y >= img_h:
+            return
+
+        bx1, by1, bx2, by2 = button_rect
+
+        if event == cv2.EVENT_LBUTTONDOWN:
+            if bx1 <= x <= bx2 and by1 <= y <= by2:
+                ui_state["save_requested"] = True
+                return
+
+            ui_state["drawing"] = True
+            ui_state["start"] = clamp_point(x, y)
+            ui_state["current"] = clamp_point(x, y)
+
+        elif event == cv2.EVENT_MOUSEMOVE and ui_state["drawing"]:
+            ui_state["current"] = clamp_point(x, y)
+
+        elif event == cv2.EVENT_LBUTTONUP and ui_state["drawing"]:
+            ui_state["current"] = clamp_point(x, y)
+            x1 = min(ui_state["start"][0], ui_state["current"][0])
+            y1 = min(ui_state["start"][1], ui_state["current"][1])
+            x2 = max(ui_state["start"][0], ui_state["current"][0])
+            y2 = max(ui_state["start"][1], ui_state["current"][1])
+
+            w = x2 - x1
+            h = y2 - y1
+
+            if w >= 5 and h >= 5:
+                ui_state["manual_rects"].append(
+                    {
+                        "x": int(x1),
+                        "y": int(y1),
+                        "width": int(w),
+                        "height": int(h),
+                        "type": ui_state["manual_type"],
+                        "source": "manual",
+                    }
+                )
+
+            ui_state["drawing"] = False
+
+    cv2.setMouseCallback(WINDOW_NAME, on_mouse)
     
     # Toggles de visibilidad por tipo
     tipos_visibles = {
@@ -572,12 +689,15 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
 
     print("Controles:")
     print("- Ajusta sliders en tiempo real")
-    print("- Tecla 's' para guardar JSON + preview")
+    print("- Clic izquierdo y arrastrar en imagen para crear rectangulo manual")
+    print("- Tipos manuales: a=agua, t=tejado, v=vegetacion, o=solido")
+    print("- Boton GUARDAR (en la imagen) o tecla 's' para elegir donde guardar")
     print("- Tecla 'g' para guardar perfil actual como 'custom'")
     print("- Teclas 1/2/3/4 para cargar perfil bosque/ciudad/costa/custom")
     print("- Tecla 'a' selecciona tipo agua, 't' tipo tejado, 'v' tipo vegetacion")
     print("- Tecla 'u' aplica sliders H2/S2/V2 al tipo seleccionado")
     print("- Mayúsculas A/T/V/O togglean visibilidad agua/tejado/vegetacion/solidos")
+    print("- Tecla 'z' deshace ultimo rectangulo manual, 'c' limpia todos")
     print("- Tecla 'q' o ESC para salir")
     print("  Modo 2 híbrido = HSV (agua/tejado) + bordes (sólidos)")
 
@@ -693,17 +813,62 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             colisiones = deduplicar_colisiones(colisiones, iou_threshold=0.55)
             mask = cv2.bitwise_or(mask_edges, mask_hsv_total)
 
+        manual_rects = list(ui_state["manual_rects"])
+        manual_cajas = [(m["x"], m["y"], m["width"], m["height"]) for m in manual_rects]
+
+        colisiones_total = list(colisiones) + manual_rects
+        cajas_visuales_total = list(cajas_visuales) + manual_cajas
+
         # Filtrar colisiones por visibilidad de tipos
-        colisiones_visibles = [c for c in colisiones if tipos_visibles.get(c.get("type", "solido"), True)]
-        cajas_visuales_visibles = [cajas_visuales[i] for i, c in enumerate(colisiones) if tipos_visibles.get(c.get("type", "solido"), True)]
+        colisiones_visibles = [c for c in colisiones_total if tipos_visibles.get(c.get("type", "solido"), True)]
+        cajas_visuales_visibles = [
+            cajas_visuales_total[i]
+            for i, c in enumerate(colisiones_total)
+            if tipos_visibles.get(c.get("type", "solido"), True)
+        ]
         
         preview = dibujar_resultado(img, cajas_visuales_visibles, colisiones_visibles)
+
+        # Dibuja rectangulo temporal mientras se arrastra con el mouse.
+        if ui_state["drawing"]:
+            x1 = min(ui_state["start"][0], ui_state["current"][0])
+            y1 = min(ui_state["start"][1], ui_state["current"][1])
+            x2 = max(ui_state["start"][0], ui_state["current"][0])
+            y2 = max(ui_state["start"][1], ui_state["current"][1])
+            color_tmp = color_por_tipo.get(ui_state["manual_type"], (255, 255, 255))
+            cv2.rectangle(preview, (x1, y1), (x2, y2), color_tmp, 2)
+            cv2.putText(
+                preview,
+                f"Manual: {ui_state['manual_type']}",
+                (x1, max(15, y1 - 6)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color_tmp,
+                1,
+                cv2.LINE_AA,
+            )
+
+        # Boton de guardado clicable.
+        bx1, by1, bx2, by2 = button_rect
+        cv2.rectangle(preview, (bx1, by1), (bx2, by2), (40, 120, 40), -1)
+        cv2.rectangle(preview, (bx1, by1), (bx2, by2), (230, 230, 230), 1)
+        cv2.putText(
+            preview,
+            "GUARDAR",
+            (bx1 + 24, by1 + 26),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
         mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
         vista = np.hstack((preview, mask_bgr))
         cv2.putText(
             vista,
-            f"Modo: {ultimo_modo} | Perfil: {perfil_activo} | Colisiones: {len(colisiones_visibles)}",
+            f"Modo: {ultimo_modo} | Perfil: {perfil_activo} | Colisiones: {len(colisiones_visibles)} | Manuales: {len(manual_rects)}",
             (10, 25),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
@@ -713,7 +878,7 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
         )
         cv2.putText(
             vista,
-            f"Tipo HSV activo: {tipo_hibrido_activo} (a=agua, t=tejado, v=vegetacion, u=aplicar)",
+            f"Tipo HSV activo: {tipo_hibrido_activo} | Tipo manual: {ui_state['manual_type']} (a/t/v/o)",
             (10, 50),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
@@ -736,12 +901,21 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
         cv2.imshow(WINDOW_NAME, vista)
 
         ultima_preview = preview
-        ultimas_colisiones = colisiones
+        ultimas_colisiones = colisiones_total
 
         key = cv2.waitKey(30) & 0xFF
-        if key == ord("s"):
+        if key == ord("s") or ui_state["save_requested"]:
             prefijo = f"rpg_{ultimo_modo}"
-            guardar_salida(ultima_preview, ultimas_colisiones, prefijo=prefijo)
+            img_path, json_path = seleccionar_rutas_guardado(ruta_imagen, prefijo=prefijo)
+            if img_path and json_path:
+                guardar_salida(
+                    ultima_preview,
+                    ultimas_colisiones,
+                    prefijo=prefijo,
+                    imagen_salida=img_path,
+                    json_salida=json_path,
+                )
+            ui_state["save_requested"] = False
         elif key == ord("A"):
             tipos_visibles["agua"] = not tipos_visibles["agua"]
             print(f"Agua: {'ON' if tipos_visibles['agua'] else 'OFF'}")
@@ -762,20 +936,33 @@ def extraer_colisiones_rpg_interactivo(ruta_imagen):
             print(f"Perfil guardado en: {ruta_perfiles} (custom)")
         elif key == ord("a"):
             tipo_hibrido_activo = "agua"
+            ui_state["manual_type"] = "agua"
             set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
             print("Tipo híbrido activo: agua")
         elif key == ord("t"):
             tipo_hibrido_activo = "tejado"
+            ui_state["manual_type"] = "tejado"
             set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
             print("Tipo híbrido activo: tejado")
         elif key == ord("v"):
             tipo_hibrido_activo = "vegetacion"
+            ui_state["manual_type"] = "vegetacion"
             set_hybrid_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo))
             print("Tipo híbrido activo: vegetacion")
+        elif key == ord("o"):
+            ui_state["manual_type"] = "solido"
+            print("Tipo manual activo: solido")
         elif key == ord("u"):
             slot = ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo)
             slot.update(read_hybrid_trackbars(tipo_hibrido_activo))
             print(f"Rango actualizado para tipo: {tipo_hibrido_activo}")
+        elif key == ord("z"):
+            if ui_state["manual_rects"]:
+                ui_state["manual_rects"].pop()
+                print("Se deshizo el ultimo rectangulo manual.")
+        elif key == ord("c"):
+            ui_state["manual_rects"].clear()
+            print("Se limpiaron todos los rectangulos manuales.")
         elif key in (ord("1"), ord("2"), ord("3"), ord("4")):
             idx = int(chr(key)) - 1
             if 0 <= idx < len(profile_keys):
