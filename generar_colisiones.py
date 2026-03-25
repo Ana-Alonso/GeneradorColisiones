@@ -1,1547 +1,780 @@
+import copy
 import json
 import os
-from copy import deepcopy
 import tkinter as tk
+from dataclasses import dataclass
 from tkinter import filedialog
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 
 
-WINDOW_NAME = "Colisiones RPG - Debug"
-PROFILE_FILE = "perfiles_colisiones_rpg.json"
-ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".web"}
-ALLOWED_SAVE_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-
-SLIDER_DEFS = [
-    {"key": "modo", "label": "Modo", "min": 0, "max": 2, "basic": True},
-    {"key": "blur", "label": "Blur", "min": 1, "max": 31, "basic": True},
-    {"key": "canny_low", "label": "Canny Low", "min": 0, "max": 255, "basic": True},
-    {"key": "canny_high", "label": "Canny High", "min": 1, "max": 255, "basic": True},
-    {"key": "kernel", "label": "Kernel", "min": 1, "max": 31, "basic": True},
-    {"key": "h_min", "label": "H min", "min": 0, "max": 179, "basic": True},
-    {"key": "h_max", "label": "H max", "min": 0, "max": 179, "basic": True},
-    {"key": "s_min", "label": "S min", "min": 0, "max": 255, "basic": True},
-    {"key": "s_max", "label": "S max", "min": 0, "max": 255, "basic": True},
-    {"key": "v_min", "label": "V min", "min": 0, "max": 255, "basic": True},
-    {"key": "v_max", "label": "V max", "min": 0, "max": 255, "basic": True},
-    {"key": "min_w", "label": "Min W", "min": 0, "max": 500, "basic": True},
-    {"key": "min_h", "label": "Min H", "min": 0, "max": 500, "basic": True},
-    {"key": "max_w_pct", "label": "Max W %", "min": 1, "max": 100, "basic": False},
-    {"key": "max_h_pct", "label": "Max H %", "min": 1, "max": 100, "basic": False},
-    {"key": "base_ratio", "label": "Base %", "min": 0, "max": 100, "basic": True},
-    {"key": "x_margin_ratio", "label": "Margen X %", "min": 0, "max": 40, "basic": True},
-]
-
-# Presets iniciales para modo híbrido. Ajusta estos rangos a tu paleta real.
-HYBRID_HSV_RANGES = [
-    {
-        "type": "agua",
-        "h_min": 80,
-        "h_max": 130,
-        "s_min": 40,
-        "s_max": 255,
-        "v_min": 20,
-        "v_max": 255,
-    },
-    {
-        "type": "tejado",
-        "h_min": 0,
-        "h_max": 25,
-        "s_min": 50,
-        "s_max": 255,
-        "v_min": 40,
-        "v_max": 255,
-    },
-    {
-        "type": "vegetacion",
-        "h_min": 35,
-        "h_max": 90,
-        "s_min": 35,
-        "s_max": 255,
-        "v_min": 20,
-        "v_max": 255,
-    },
-]
-
-DEFAULT_PROFILES = {
-    "bosque": {
-        "modo": 2,
-        "blur": 3,
-        "canny_low": 25,
-        "canny_high": 95,
-        "kernel": 5,
-        "h_min": 0,
-        "h_max": 179,
-        "s_min": 0,
-        "s_max": 255,
-        "v_min": 0,
-        "v_max": 255,
-        "min_w": 18,
-        "min_h": 18,
-        "max_w_pct": 90,
-        "max_h_pct": 90,
-        "base_pct": 40,
-        "margen_x_pct": 5,
-        "hybrid_hsv_ranges": HYBRID_HSV_RANGES,
-    },
-    "ciudad": {
-        "modo": 2,
-        "blur": 5,
-        "canny_low": 35,
-        "canny_high": 120,
-        "kernel": 7,
-        "h_min": 0,
-        "h_max": 179,
-        "s_min": 0,
-        "s_max": 255,
-        "v_min": 0,
-        "v_max": 255,
-        "min_w": 24,
-        "min_h": 24,
-        "max_w_pct": 92,
-        "max_h_pct": 92,
-        "base_pct": 35,
-        "margen_x_pct": 4,
-        "hybrid_hsv_ranges": HYBRID_HSV_RANGES,
-    },
-    "costa": {
-        "modo": 2,
-        "blur": 3,
-        "canny_low": 20,
-        "canny_high": 80,
-        "kernel": 5,
-        "h_min": 80,
-        "h_max": 130,
-        "s_min": 40,
-        "s_max": 255,
-        "v_min": 20,
-        "v_max": 255,
-        "min_w": 20,
-        "min_h": 20,
-        "max_w_pct": 95,
-        "max_h_pct": 95,
-        "base_pct": 40,
-        "margen_x_pct": 5,
-        "hybrid_hsv_ranges": HYBRID_HSV_RANGES,
-    },
-}
+WINDOW_MAIN = "Extractor Universal - Mapa"
+WINDOW_MASK = "Extractor Universal - Mascara"
+WINDOW_CTRL = "Extractor Universal - Controles"
+PROFILES_FILE = os.path.join(os.path.dirname(__file__), "perfiles_colisiones_rpg.json")
 
 
-def noop(_value):
-    pass
+TYPE_SOLIDO = "solido"
+TYPE_AGUA = "agua"
+TYPE_TEJADO = "tejado"
+TYPE_VEGETACION = "vegetacion"
+COLLISION_TYPES = [TYPE_SOLIDO, TYPE_AGUA, TYPE_TEJADO, TYPE_VEGETACION]
+
+MODE_BORDES = 0
+MODE_HSV = 1
+MODE_HIBRIDO = 2
 
 
-def clamp(value, low, high):
-    return max(low, min(high, int(value)))
+@dataclass
+class Rect:
+    x: int
+    y: int
+    w: int
+    h: int
+    tipo: str
+    fuente: str = "manual"
 
+    def clamp_positive(self) -> None:
+        self.w = max(1, int(self.w))
+        self.h = max(1, int(self.h))
 
-def sanitize_profile(profile):
-    p = deepcopy(profile)
-    p["modo"] = clamp(p.get("modo", 2), 0, 2)
-    p["blur"] = clamp(p.get("blur", 5), 1, 31)
-    p["canny_low"] = clamp(p.get("canny_low", 35), 0, 255)
-    p["canny_high"] = clamp(p.get("canny_high", 110), 1, 255)
-    if p["canny_high"] <= p["canny_low"]:
-        p["canny_high"] = min(255, p["canny_low"] + 1)
-    p["kernel"] = clamp(p.get("kernel", 5), 1, 31)
-
-    p["h_min"] = clamp(p.get("h_min", 0), 0, 179)
-    p["h_max"] = clamp(p.get("h_max", 179), 0, 179)
-    p["s_min"] = clamp(p.get("s_min", 0), 0, 255)
-    p["s_max"] = clamp(p.get("s_max", 255), 0, 255)
-    p["v_min"] = clamp(p.get("v_min", 0), 0, 255)
-    p["v_max"] = clamp(p.get("v_max", 255), 0, 255)
-
-    p["min_w"] = clamp(p.get("min_w", 24), 0, 500)
-    p["min_h"] = clamp(p.get("min_h", 24), 0, 500)
-    p["max_w_pct"] = clamp(p.get("max_w_pct", 90), 1, 100)
-    p["max_h_pct"] = clamp(p.get("max_h_pct", 90), 1, 100)
-    p["base_pct"] = clamp(p.get("base_pct", 40), 0, 100)
-    p["margen_x_pct"] = clamp(p.get("margen_x_pct", 5), 0, 40)
-
-    ranges = p.get("hybrid_hsv_ranges", HYBRID_HSV_RANGES)
-    if not isinstance(ranges, list) or not ranges:
-        ranges = deepcopy(HYBRID_HSV_RANGES)
-    p["hybrid_hsv_ranges"] = []
-    for r in ranges:
-        p["hybrid_hsv_ranges"].append(
-            {
-                "type": str(r.get("type", "hsv")),
-                "h_min": clamp(r.get("h_min", 0), 0, 179),
-                "h_max": clamp(r.get("h_max", 179), 0, 179),
-                "s_min": clamp(r.get("s_min", 0), 0, 255),
-                "s_max": clamp(r.get("s_max", 255), 0, 255),
-                "v_min": clamp(r.get("v_min", 0), 0, 255),
-                "v_max": clamp(r.get("v_max", 255), 0, 255),
-            }
-        )
-
-    return p
-
-
-def find_hybrid_range(ranges, tipo):
-    for r in ranges:
-        if r.get("type") == tipo:
-            return r
-    return None
-
-
-def ensure_hybrid_type(ranges, tipo):
-    found = find_hybrid_range(ranges, tipo)
-    if found is not None:
-        return found
-
-    default = find_hybrid_range(HYBRID_HSV_RANGES, tipo)
-    if default is None:
-        default = {
-            "type": tipo,
-            "h_min": 0,
-            "h_max": 179,
-            "s_min": 0,
-            "s_max": 255,
-            "v_min": 0,
-            "v_max": 255,
+    def to_dict(self) -> Dict[str, int]:
+        return {
+            "x": int(self.x),
+            "y": int(self.y),
+            "w": int(self.w),
+            "h": int(self.h),
+            "tipo": self.tipo,
+            "fuente": self.fuente,
         }
-    else:
-        default = deepcopy(default)
-
-    ranges.append(default)
-    return default
 
 
-def set_main_hsv_trackbars(hsv_range, param_cache):
-    param_cache["h_min"] = clamp(hsv_range["h_min"], 0, 179)
-    param_cache["h_max"] = clamp(hsv_range["h_max"], 0, 179)
-    param_cache["s_min"] = clamp(hsv_range["s_min"], 0, 255)
-    param_cache["s_max"] = clamp(hsv_range["s_max"], 0, 255)
-    param_cache["v_min"] = clamp(hsv_range["v_min"], 0, 255)
-    param_cache["v_max"] = clamp(hsv_range["v_max"], 0, 255)
-
-
-def read_main_hsv_trackbars(tipo, param_cache):
-    return {
-        "type": tipo,
-        "h_min": int(param_cache["h_min"]),
-        "h_max": int(param_cache["h_max"]),
-        "s_min": int(param_cache["s_min"]),
-        "s_max": int(param_cache["s_max"]),
-        "v_min": int(param_cache["v_min"]),
-        "v_max": int(param_cache["v_max"]),
-    }
-
-
-def cargar_perfiles(ruta_perfiles):
-    perfiles = {k: sanitize_profile(v) for k, v in DEFAULT_PROFILES.items()}
-    if not os.path.exists(ruta_perfiles):
-        return perfiles
-
-    try:
-        with open(ruta_perfiles, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            for name, profile in data.items():
-                if isinstance(profile, dict):
-                    perfiles[name] = sanitize_profile(profile)
-    except (OSError, json.JSONDecodeError):
-        print("Aviso: no se pudieron leer perfiles guardados, se usarán defaults.")
-
-    return perfiles
-
-
-def guardar_perfiles(ruta_perfiles, perfiles):
-    data = {name: sanitize_profile(profile) for name, profile in perfiles.items()}
-    with open(ruta_perfiles, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-
-def aplicar_perfil_trackbars(profile, param_cache=None):
-    p = sanitize_profile(profile)
-    values = {
-        "modo": p["modo"],
-        "blur": p["blur"],
-        "canny_low": p["canny_low"],
-        "canny_high": p["canny_high"],
-        "kernel": p["kernel"],
-        "h_min": p["h_min"],
-        "h_max": p["h_max"],
-        "s_min": p["s_min"],
-        "s_max": p["s_max"],
-        "v_min": p["v_min"],
-        "v_max": p["v_max"],
-        "min_w": p["min_w"],
-        "min_h": p["min_h"],
-        "max_w_pct": p["max_w_pct"],
-        "max_h_pct": p["max_h_pct"],
-        "base_ratio": p["base_pct"] / 100.0,
-        "x_margin_ratio": p["margen_x_pct"] / 100.0,
-    }
-    if param_cache is not None:
-        param_cache.update(values)
-    return values
-
-
-def perfil_desde_parametros(p, hybrid_hsv_ranges):
-    return {
-        "modo": p["modo"],
-        "blur": p["blur"],
-        "canny_low": p["canny_low"],
-        "canny_high": p["canny_high"],
-        "kernel": p["kernel"],
-        "h_min": p["h_min"],
-        "h_max": p["h_max"],
-        "s_min": p["s_min"],
-        "s_max": p["s_max"],
-        "v_min": p["v_min"],
-        "v_max": p["v_max"],
-        "min_w": p["min_w"],
-        "min_h": p["min_h"],
-        "max_w_pct": p["max_w_pct"],
-        "max_h_pct": p["max_h_pct"],
-        "base_pct": int(round(p["base_ratio"] * 100)),
-        "margen_x_pct": int(round(p["x_margin_ratio"] * 100)),
-        "hybrid_hsv_ranges": deepcopy(hybrid_hsv_ranges),
-    }
-
-
-def odd_from_slider(value):
-    """Convierte valor de trackbar en impar >= 1."""
-    value = max(1, int(value))
+def odd_value(value: int, minimum: int = 1) -> int:
+    value = max(minimum, int(value))
     if value % 2 == 0:
         value += 1
     return value
 
 
-def get_slider_raw_value(params, key):
-    value = params[key]
-    if key in ("base_ratio", "x_margin_ratio"):
-        return int(round(float(value) * 100))
-    return int(round(float(value)))
+def rect_intersection_area(a: Rect, b: Rect) -> int:
+    x1 = max(a.x, b.x)
+    y1 = max(a.y, b.y)
+    x2 = min(a.x + a.w, b.x + b.w)
+    y2 = min(a.y + a.h, b.y + b.h)
+    if x2 <= x1 or y2 <= y1:
+        return 0
+    return (x2 - x1) * (y2 - y1)
 
 
-def set_slider_raw_value(params, key, raw_value):
-    if key in ("base_ratio", "x_margin_ratio"):
-        params[key] = float(raw_value) / 100.0
-    else:
-        params[key] = int(raw_value)
-
-
-def draw_slider_panel(width, params, show_advanced):
-    defs = [d for d in SLIDER_DEFS if d["basic"] or show_advanced]
-    cols = 3
-    rows = max(1, int(np.ceil(len(defs) / float(cols))))
-    header_h = 34
-    row_h = 34
-    panel_h = header_h + rows * row_h + 12
-
-    panel = np.full((panel_h, width, 3), 35, dtype=np.uint8)
-    cv2.rectangle(panel, (0, 0), (width - 1, panel_h - 1), (70, 70, 70), 1)
-
-    title = "Controles basicos" if not show_advanced else "Controles basicos + avanzados"
-    cv2.putText(panel, title, (12, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (230, 230, 230), 1, cv2.LINE_AA)
-
-    toggle_w = 170
-    toggle_h = 24
-    toggle_x2 = width - 12
-    toggle_x1 = max(12, toggle_x2 - toggle_w)
-    toggle_y1 = 6
-    toggle_y2 = toggle_y1 + toggle_h
-    toggle_rect = (toggle_x1, toggle_y1, toggle_x2, toggle_y2)
-    cv2.rectangle(panel, (toggle_x1, toggle_y1), (toggle_x2, toggle_y2), (70, 100, 160), -1)
-    cv2.rectangle(panel, (toggle_x1, toggle_y1), (toggle_x2, toggle_y2), (220, 220, 220), 1)
-    toggle_text = "Desplegar avanzados" if not show_advanced else "Ocultar avanzados"
-    cv2.putText(panel, toggle_text, (toggle_x1 + 8, toggle_y1 + 17), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-
-    margin = 12
-    y0 = header_h
-    cell_w = (width - margin * 2) // cols
-    slider_layout = []
-
-    for i, d in enumerate(defs):
-        col = i % cols
-        row = i // cols
-        cell_x = margin + col * cell_w
-        cell_y = y0 + row * row_h
-
-        x1 = cell_x + 74
-        x2 = cell_x + cell_w - 10
-        y = cell_y + 16
-        if x2 - x1 < 30:
-            continue
-
-        raw_value = get_slider_raw_value(params, d["key"])
-        raw_value = clamp(raw_value, d["min"], d["max"])
-        ratio = 0.0 if d["max"] == d["min"] else (raw_value - d["min"]) / float(d["max"] - d["min"])
-        knob_x = int(round(x1 + ratio * (x2 - x1)))
-
-        cv2.putText(panel, f"{d['label']}: {raw_value}", (cell_x + 2, y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.43, (220, 220, 220), 1, cv2.LINE_AA)
-        cv2.line(panel, (x1, y), (x2, y), (120, 120, 120), 2)
-        cv2.circle(panel, (knob_x, y), 5, (80, 180, 255), -1)
-
-        slider_layout.append({
-            "key": d["key"],
-            "min": d["min"],
-            "max": d["max"],
-            "x1": x1,
-            "x2": x2,
-            "y": y,
-            "hit_y1": y - 10,
-            "hit_y2": y + 10,
-        })
-
-    return panel, panel_h, toggle_rect, slider_layout
-
-
-def slider_value_from_x(x, slider):
-    x1, x2 = slider["x1"], slider["x2"]
-    if x2 <= x1:
-        return slider["min"]
-    t = (x - x1) / float(x2 - x1)
-    t = max(0.0, min(1.0, t))
-    return int(round(slider["min"] + t * (slider["max"] - slider["min"])))
-
-
-def ajustar_tamano_ventana(img_w, img_h, panel_h):
-    cv2.resizeWindow(WINDOW_NAME, max(1500, img_w * 2), max(720, img_h + panel_h + 60))
-
-def build_mask_edges(img, blur_size, canny_low, canny_high, kernel_size):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (blur_size, blur_size), 0)
-    edges = cv2.Canny(blurred, canny_low, canny_high)
-
-    kernel = np.ones((kernel_size, kernel_size), np.uint8)
-    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-    return edges, closed
-
-
-def build_mask_hsv(img, h_min, h_max, s_min, s_max, v_min, v_max, kernel_size):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    lower = np.array([h_min, s_min, v_min], dtype=np.uint8)
-    upper = np.array([h_max, s_max, v_max], dtype=np.uint8)
-
-    if h_min <= h_max:
-        mask = cv2.inRange(hsv, lower, upper)
-    else:
-        # Permite wrap de H para seleccionar rojos y otros rangos que cruzan 179->0.
-        lower_1 = np.array([0, s_min, v_min], dtype=np.uint8)
-        upper_1 = np.array([h_max, s_max, v_max], dtype=np.uint8)
-        lower_2 = np.array([h_min, s_min, v_min], dtype=np.uint8)
-        upper_2 = np.array([179, s_max, v_max], dtype=np.uint8)
-        mask = cv2.inRange(hsv, lower_1, upper_1) | cv2.inRange(hsv, lower_2, upper_2)
-
-    kernel = np.ones((kernel_size, kernel_size), np.uint8)
-    cleaned = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-    cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, kernel)
-    return mask, cleaned
-
-
-def rect_iou(a, b):
-    ax1, ay1 = a["x"], a["y"]
-    ax2, ay2 = ax1 + a["width"], ay1 + a["height"]
-    bx1, by1 = b["x"], b["y"]
-    bx2, by2 = bx1 + b["width"], by1 + b["height"]
-
-    inter_x1 = max(ax1, bx1)
-    inter_y1 = max(ay1, by1)
-    inter_x2 = min(ax2, bx2)
-    inter_y2 = min(ay2, by2)
-
-    inter_w = max(0, inter_x2 - inter_x1)
-    inter_h = max(0, inter_y2 - inter_y1)
-    inter_area = inter_w * inter_h
-    if inter_area == 0:
+def rect_iou(a: Rect, b: Rect) -> float:
+    inter = rect_intersection_area(a, b)
+    if inter <= 0:
         return 0.0
-
-    area_a = (ax2 - ax1) * (ay2 - ay1)
-    area_b = (bx2 - bx1) * (by2 - by1)
-    union = area_a + area_b - inter_area
+    area_a = a.w * a.h
+    area_b = b.w * b.h
+    union = area_a + area_b - inter
     if union <= 0:
         return 0.0
-    return inter_area / union
+    return float(inter) / float(union)
 
 
-def rect_intersection_area(a, b):
-    ax1, ay1 = a["x"], a["y"]
-    ax2, ay2 = ax1 + a["width"], ay1 + a["height"]
-    bx1, by1 = b["x"], b["y"]
-    bx2, by2 = bx1 + b["width"], by1 + b["height"]
-
-    inter_x1 = max(ax1, bx1)
-    inter_y1 = max(ay1, by1)
-    inter_x2 = min(ax2, bx2)
-    inter_y2 = min(ay2, by2)
-
-    inter_w = max(0, inter_x2 - inter_x1)
-    inter_h = max(0, inter_y2 - inter_y1)
-    return inter_w * inter_h
+def merge_two_rects(a: Rect, b: Rect) -> Rect:
+    x1 = min(a.x, b.x)
+    y1 = min(a.y, b.y)
+    x2 = max(a.x + a.w, b.x + b.w)
+    y2 = max(a.y + a.h, b.y + b.h)
+    return Rect(x1, y1, x2 - x1, y2 - y1, a.tipo, "manual")
 
 
-def merge_manual_rectangles(rects, iou_threshold=0.2, enabled_types=None):
-    if not rects:
-        return []
-
-    if enabled_types is not None:
-        enabled_types = set(enabled_types)
-
-    merged = [dict(r) for r in rects]
-    changed = True
-
-    while changed:
-        changed = False
-        for i in range(len(merged)):
-            if changed:
-                break
-            for j in range(i + 1, len(merged)):
-                a = merged[i]
-                b = merged[j]
-                if a.get("type") != b.get("type"):
-                    continue
-                if enabled_types is not None and a.get("type") not in enabled_types:
-                    continue
-
-                if rect_intersection_area(a, b) > 0 or rect_iou(a, b) >= iou_threshold:
-                    x1 = min(a["x"], b["x"])
-                    y1 = min(a["y"], b["y"])
-                    x2 = max(a["x"] + a["width"], b["x"] + b["width"])
-                    y2 = max(a["y"] + a["height"], b["y"] + b["height"])
-
-                    merged[i] = {
-                        "x": int(x1),
-                        "y": int(y1),
-                        "width": int(max(1, x2 - x1)),
-                        "height": int(max(1, y2 - y1)),
-                        "type": a.get("type", "solido"),
-                        "source": "manual",
-                    }
-                    merged.pop(j)
-                    changed = True
-                    break
-
-    return merged
-
-
-def find_rect_at_point(rects, x, y):
-    # Busca desde el ultimo para priorizar el rectangulo mas reciente.
-    for i in range(len(rects) - 1, -1, -1):
-        r = rects[i]
-        rx, ry = int(r["x"]), int(r["y"])
-        rw, rh = int(r["width"]), int(r["height"])
-        if rx <= x <= rx + rw and ry <= y <= ry + rh:
-            return i
-    return -1
-
-
-def is_rect_excluded(rect, excluded_rects, iou_threshold=0.85):
-    rect_type = rect.get("type", "solido")
-    for e in excluded_rects:
-        if e.get("type", "solido") != rect_type:
-            continue
-        if rect_intersection_area(rect, e) > 0 or rect_iou(rect, e) >= iou_threshold:
-            return True
-    return False
-
-
-def deduplicar_colisiones(colisiones, iou_threshold=0.55):
-    if not colisiones:
-        return []
-
-    ordenadas = sorted(colisiones, key=lambda c: c["width"] * c["height"], reverse=True)
-    resultado = []
-
-    for c in ordenadas:
-        if all(rect_iou(c, kept) < iou_threshold for kept in resultado):
-            resultado.append(c)
-
-    return sorted(resultado, key=lambda c: (c["y"], c["x"]))
-
-
-def extraer_cajas(
-    mask,
-    img_shape,
-    min_w,
-    min_h,
-    max_w_pct,
-    max_h_pct,
-    base_ratio,
-    x_margin_ratio,
-    obstacle_type="solido",
-):
-    alto_img, ancho_img = img_shape[:2]
-
-    max_w = int(ancho_img * (max_w_pct / 100.0))
-    max_h = int(alto_img * (max_h_pct / 100.0))
-
-    contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    cajas_visuales = []
-    colisiones = []
-
-    for c in contornos:
-        x, y, w, h = cv2.boundingRect(c)
-
-        if w < min_w or h < min_h:
-            continue
-        if w > max_w or h > max_h:
-            continue
-
-        h_colision = max(1, int(h * base_ratio))
-        y_colision = y + (h - h_colision)
-
-        margen_x = int(w * x_margin_ratio)
-        x_colision = x + margen_x
-        w_colision = max(1, w - (margen_x * 2))
-
-        cajas_visuales.append((x, y, w, h))
-        colisiones.append(
-            {
-                "x": int(x_colision),
-                "y": int(y_colision),
-                "width": int(w_colision),
-                "height": int(h_colision),
-                "type": obstacle_type,
-            }
-        )
-
-    return cajas_visuales, colisiones
-
-
-def dibujar_resultado(img, cajas_visuales, colisiones):
-    out = img.copy()
-    for x, y, w, h in cajas_visuales:
-        cv2.rectangle(out, (x, y), (x + w, y + h), (255, 0, 0), 1)
-
-    color_por_tipo = {
-        "solido": (0, 0, 255),
-        "agua": (255, 255, 0),
-        "tejado": (0, 165, 255),
-        "vegetacion": (0, 255, 0),
+def ensure_profiles_file() -> Dict[str, Dict[str, int]]:
+    defaults = {
+        "Bosque": {
+            "mode": MODE_HIBRIDO,
+            "blur": 5,
+            "canny_low": 40,
+            "canny_high": 130,
+            "kernel": 5,
+            "h_min": 20,
+            "s_min": 50,
+            "v_min": 40,
+            "h_max": 95,
+            "s_max": 255,
+            "v_max": 255,
+            "h2_min": 35,
+            "s2_min": 40,
+            "v2_min": 20,
+            "h2_max": 130,
+            "s2_max": 255,
+            "v2_max": 255,
+            "min_w": 6,
+            "min_h": 6,
+            "max_w_pct": 90,
+            "max_h_pct": 90,
+            "base_pct": 35,
+            "margin_x_pct": 8,
+        },
+        "Ciudad": {
+            "mode": MODE_BORDES,
+            "blur": 3,
+            "canny_low": 60,
+            "canny_high": 180,
+            "kernel": 3,
+            "h_min": 0,
+            "s_min": 0,
+            "v_min": 0,
+            "h_max": 179,
+            "s_max": 255,
+            "v_max": 255,
+            "h2_min": 0,
+            "s2_min": 0,
+            "v2_min": 0,
+            "h2_max": 179,
+            "s2_max": 255,
+            "v2_max": 255,
+            "min_w": 8,
+            "min_h": 8,
+            "max_w_pct": 85,
+            "max_h_pct": 85,
+            "base_pct": 40,
+            "margin_x_pct": 10,
+        },
+        "Costa": {
+            "mode": MODE_HIBRIDO,
+            "blur": 5,
+            "canny_low": 35,
+            "canny_high": 120,
+            "kernel": 5,
+            "h_min": 85,
+            "s_min": 30,
+            "v_min": 40,
+            "h_max": 130,
+            "s_max": 255,
+            "v_max": 255,
+            "h2_min": 15,
+            "s2_min": 20,
+            "v2_min": 40,
+            "h2_max": 60,
+            "s2_max": 255,
+            "v2_max": 255,
+            "min_w": 6,
+            "min_h": 6,
+            "max_w_pct": 90,
+            "max_h_pct": 90,
+            "base_pct": 30,
+            "margin_x_pct": 6,
+        },
+        "Custom": {
+            "mode": MODE_HIBRIDO,
+            "blur": 3,
+            "canny_low": 50,
+            "canny_high": 150,
+            "kernel": 3,
+            "h_min": 0,
+            "s_min": 0,
+            "v_min": 0,
+            "h_max": 179,
+            "s_max": 255,
+            "v_max": 255,
+            "h2_min": 0,
+            "s2_min": 0,
+            "v2_min": 0,
+            "h2_max": 179,
+            "s2_max": 255,
+            "v2_max": 255,
+            "min_w": 4,
+            "min_h": 4,
+            "max_w_pct": 100,
+            "max_h_pct": 100,
+            "base_pct": 40,
+            "margin_x_pct": 0,
+        },
     }
 
-    for col in colisiones:
-        x, y, w, h = col["x"], col["y"], col["width"], col["height"]
-        tipo = col.get("type", "solido")
-        color = color_por_tipo.get(tipo, (0, 0, 255))
-        cv2.rectangle(out, (x, y), (x + w, y + h), color, 2)
+    if not os.path.exists(PROFILES_FILE):
+        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            json.dump(defaults, f, indent=2, ensure_ascii=False)
+        return defaults
 
-    return out
-
-
-def guardar_salida(output_img, colisiones, prefijo="rpg", imagen_salida=None, json_salida=None):
-    if not imagen_salida:
-        imagen_salida = f"mapa_con_colisiones_{prefijo}.jpg"
-    if not json_salida:
-        json_salida = f"datos_colisiones_{prefijo}.json"
-
-    cv2.imwrite(imagen_salida, output_img)
-    por_tipo = {}
-    for col in colisiones:
-        tipo = col.get("type", "solido")
-        por_tipo.setdefault(tipo, []).append(col)
-
-    with open(json_salida, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "colisiones": colisiones,
-                "por_tipo": por_tipo,
-            },
-            f,
-            indent=4,
-            ensure_ascii=False,
-        )
-
-    print(f"Guardado: {imagen_salida}")
-    print(f"Guardado: {json_salida}")
-    print(f"Total colisiones: {len(colisiones)}")
+    try:
+        with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        for name, values in defaults.items():
+            if name not in loaded:
+                loaded[name] = values
+            else:
+                for k, v in values.items():
+                    loaded[name].setdefault(k, v)
+        return loaded
+    except Exception:
+        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            json.dump(defaults, f, indent=2, ensure_ascii=False)
+        return defaults
 
 
-def seleccionar_rutas_guardado(ruta_imagen, prefijo="rpg"):
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-
-    base_dir = os.path.dirname(os.path.abspath(ruta_imagen))
-    base_name = os.path.splitext(os.path.basename(ruta_imagen))[0]
-
-    imagen_salida = filedialog.asksaveasfilename(
-        title="Guardar mapa con colisiones",
-        initialdir=base_dir,
-        initialfile=f"{base_name}_colisiones_{prefijo}.png",
-        defaultextension=".png",
-        filetypes=[
-            ("Imagen PNG", "*.png"),
-            ("Imagen JPG", "*.jpg;*.jpeg"),
-            ("Imagen WEBP", "*.webp"),
-        ],
-    )
-
-    if not imagen_salida:
-        root.destroy()
-        print("Guardado cancelado: no se selecciono ruta para la imagen.")
-        return None, None
-
-    ext = os.path.splitext(imagen_salida)[1].lower()
-    if ext not in ALLOWED_SAVE_IMAGE_EXTENSIONS:
-        root.destroy()
-        print("Formato de salida de imagen no valido. Usa: jpg, jpeg, png o webp.")
-        return None, None
-
-    json_salida = filedialog.asksaveasfilename(
-        title="Guardar datos de colisiones JSON",
-        initialdir=os.path.dirname(imagen_salida),
-        initialfile=f"{base_name}_colisiones_{prefijo}.json",
-        defaultextension=".json",
-        filetypes=[("Archivo JSON", "*.json")],
-    )
-
-    root.destroy()
-
-    if not json_salida:
-        print("Guardado cancelado: no se selecciono ruta para el JSON.")
-        return None, None
-
-    return imagen_salida, json_salida
+def save_profiles(profiles: Dict[str, Dict[str, int]]) -> None:
+    with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+        json.dump(profiles, f, indent=2, ensure_ascii=False)
 
 
-def crear_trackbars(controles_plegados=False, valores_iniciales=None):
-    _ = controles_plegados
-    _ = valores_iniciales
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_NORMAL)
+class CollisionExtractorApp:
+    def __init__(self, image: np.ndarray):
+        self.image_original = image
+        self.image_h, self.image_w = image.shape[:2]
 
+        self.current_type = TYPE_SOLIDO
+        self.manual_rects: List[Rect] = []
+        self.auto_rects: List[Rect] = []
+        self.selected_idx = -1
+        self.undo_stack: List[List[Rect]] = []
 
-def leer_parametros(ultimos_parametros):
-    p = dict(ultimos_parametros)
-    p["modo"] = clamp(p["modo"], 0, 2)
-    p["blur"] = odd_from_slider(clamp(p["blur"], 1, 31))
-    p["canny_low"] = clamp(p["canny_low"], 0, 255)
-    p["canny_high"] = clamp(p["canny_high"], 1, 255)
-    if p["canny_high"] <= p["canny_low"]:
-        p["canny_high"] = min(255, p["canny_low"] + 1)
-    p["kernel"] = odd_from_slider(clamp(p["kernel"], 1, 31))
+        self.drag_start: Optional[Tuple[int, int]] = None
+        self.drag_mode: Optional[str] = None
+        self.temp_rect: Optional[Rect] = None
+        self.resize_origin: Optional[Tuple[int, int, int, int]] = None
 
-    p["h_min"] = clamp(p["h_min"], 0, 179)
-    p["h_max"] = clamp(p["h_max"], 0, 179)
-    p["s_min"] = clamp(p["s_min"], 0, 255)
-    p["s_max"] = clamp(p["s_max"], 0, 255)
-    p["v_min"] = clamp(p["v_min"], 0, 255)
-    p["v_max"] = clamp(p["v_max"], 0, 255)
+        self.profiles = ensure_profiles_file()
 
-    p["min_w"] = clamp(p["min_w"], 0, 500)
-    p["min_h"] = clamp(p["min_h"], 0, 500)
-    p["max_w_pct"] = clamp(p["max_w_pct"], 1, 100)
-    p["max_h_pct"] = clamp(p["max_h_pct"], 1, 100)
-    p["base_ratio"] = max(0.0, min(1.0, float(p["base_ratio"])))
-    p["x_margin_ratio"] = max(0.0, min(0.40, float(p["x_margin_ratio"])))
-    return p
+        cv2.namedWindow(WINDOW_MAIN, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(WINDOW_MASK, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(WINDOW_CTRL, cv2.WINDOW_NORMAL)
 
-def extraer_colisiones_rpg_interactivo(ruta_imagen):
-    img = cv2.imread(ruta_imagen)
-    if img is None:
-        print(f"Error: No se pudo cargar la imagen '{ruta_imagen}'")
-        return
+        cv2.setMouseCallback(WINDOW_MAIN, self.on_mouse)
 
-    perfil_base = sanitize_profile(DEFAULT_PROFILES["bosque"])
-    param_cache = {
-        "modo": perfil_base["modo"],
-        "blur": perfil_base["blur"],
-        "canny_low": perfil_base["canny_low"],
-        "canny_high": perfil_base["canny_high"],
-        "kernel": perfil_base["kernel"],
-        "h_min": perfil_base["h_min"],
-        "h_max": perfil_base["h_max"],
-        "s_min": perfil_base["s_min"],
-        "s_max": perfil_base["s_max"],
-        "v_min": perfil_base["v_min"],
-        "v_max": perfil_base["v_max"],
-        "min_w": perfil_base["min_w"],
-        "min_h": perfil_base["min_h"],
-        "max_w_pct": perfil_base["max_w_pct"],
-        "max_h_pct": perfil_base["max_h_pct"],
-        "base_ratio": perfil_base["base_pct"] / 100.0,
-        "x_margin_ratio": perfil_base["margen_x_pct"] / 100.0,
-    }
+        self._create_trackbars()
+        self._apply_profile("Custom")
 
-    crear_trackbars()
-    ajustar_tamano_ventana(img.shape[1], img.shape[0], 0)
+    def _create_trackbars(self) -> None:
+        cv2.createTrackbar("Modo 0B-1H-2X", WINDOW_CTRL, MODE_HIBRIDO, 2, lambda _v: None)
+        cv2.createTrackbar("Blur", WINDOW_CTRL, 3, 31, lambda _v: None)
+        cv2.createTrackbar("Canny Low", WINDOW_CTRL, 50, 255, lambda _v: None)
+        cv2.createTrackbar("Canny High", WINDOW_CTRL, 150, 255, lambda _v: None)
+        cv2.createTrackbar("Kernel", WINDOW_CTRL, 3, 31, lambda _v: None)
 
-    base_dir = os.path.dirname(os.path.abspath(ruta_imagen))
-    ruta_perfiles = os.path.join(base_dir, PROFILE_FILE)
-    perfiles = cargar_perfiles(ruta_perfiles)
-    profile_keys = ["bosque", "ciudad", "costa", "custom"]
-    perfil_activo = "bosque"
-    hybrid_hsv_ranges = deepcopy(HYBRID_HSV_RANGES)
-    tipos_hibridos = ["agua", "tejado", "vegetacion"]
-    tipo_hibrido_activo = "agua"
+        cv2.createTrackbar("H min", WINDOW_CTRL, 0, 179, lambda _v: None)
+        cv2.createTrackbar("S min", WINDOW_CTRL, 0, 255, lambda _v: None)
+        cv2.createTrackbar("V min", WINDOW_CTRL, 0, 255, lambda _v: None)
+        cv2.createTrackbar("H max", WINDOW_CTRL, 179, 179, lambda _v: None)
+        cv2.createTrackbar("S max", WINDOW_CTRL, 255, 255, lambda _v: None)
+        cv2.createTrackbar("V max", WINDOW_CTRL, 255, 255, lambda _v: None)
 
-    img_h, img_w = img.shape[:2]
-    button_rect = (max(10, img_w - 190), 10, max(160, img_w - 20), 48)
+        cv2.createTrackbar("H2 min", WINDOW_CTRL, 0, 179, lambda _v: None)
+        cv2.createTrackbar("S2 min", WINDOW_CTRL, 0, 255, lambda _v: None)
+        cv2.createTrackbar("V2 min", WINDOW_CTRL, 0, 255, lambda _v: None)
+        cv2.createTrackbar("H2 max", WINDOW_CTRL, 179, 179, lambda _v: None)
+        cv2.createTrackbar("S2 max", WINDOW_CTRL, 255, 255, lambda _v: None)
+        cv2.createTrackbar("V2 max", WINDOW_CTRL, 255, 255, lambda _v: None)
 
-    ui_state = {
-        "interaction": "none",  # none | drawing | moving | resizing
-        "start": (0, 0),
-        "current": (0, 0),
-        "manual_type": "solido",
-        "manual_rects": [],
-        "selected_idx": -1,
-        "last_selected_idx": -2,
-        "move_offset": (0, 0),
-        "resize_handle_size": 12,
-        "last_auto_rects": [],
-        "excluded_auto_rects": [],
-        "save_requested": False,
-        "show_sliders": False,
-        "show_advanced": False,
-        "panel_height": 0,
-        "last_panel_height": -1,
-        "slider_layout": [],
-        "toggle_rect": (0, 0, 0, 0),
-        "active_slider": None,
-    }
+        cv2.createTrackbar("Min W", WINDOW_CTRL, 4, 1024, lambda _v: None)
+        cv2.createTrackbar("Min H", WINDOW_CTRL, 4, 1024, lambda _v: None)
+        cv2.createTrackbar("Max W %", WINDOW_CTRL, 100, 100, lambda _v: None)
+        cv2.createTrackbar("Max H %", WINDOW_CTRL, 100, 100, lambda _v: None)
+        cv2.createTrackbar("Base %", WINDOW_CTRL, 40, 100, lambda _v: None)
+        cv2.createTrackbar("Margen X %", WINDOW_CTRL, 0, 49, lambda _v: None)
 
-    color_por_tipo = {
-        "solido": (0, 0, 255),
-        "agua": (255, 255, 0),
-        "tejado": (0, 165, 255),
-        "vegetacion": (0, 255, 0),
-    }
+    def _set_slider(self, name: str, value: int) -> None:
+        max_v = cv2.getTrackbarPos(name, WINDOW_CTRL)
+        _ = max_v
+        cv2.setTrackbarPos(name, WINDOW_CTRL, int(value))
 
-    def clamp_point(x, y):
-        return max(0, min(img_w - 1, x)), max(0, min(img_h - 1, y))
-
-    def normalize_manual_rect(rect):
-        x = max(0, min(img_w - 1, int(rect["x"])))
-        y = max(0, min(img_h - 1, int(rect["y"])))
-        w = max(1, int(rect["width"]))
-        h = max(1, int(rect["height"]))
-        if x + w >= img_w:
-            w = max(1, img_w - x)
-        if y + h >= img_h:
-            h = max(1, img_h - y)
-        rect["x"], rect["y"], rect["width"], rect["height"] = x, y, w, h
-
-    def on_mouse(event, x, y, _flags, _param):
-        panel_h = ui_state["panel_height"]
-
-        if y < panel_h:
-            if event == cv2.EVENT_LBUTTONDOWN:
-                tx1, ty1, tx2, ty2 = ui_state["toggle_rect"]
-                if tx1 <= x <= tx2 and ty1 <= y <= ty2:
-                    ui_state["show_advanced"] = not ui_state["show_advanced"]
-                    return
-
-                for slider in ui_state["slider_layout"]:
-                    if slider["x1"] <= x <= slider["x2"] and slider["hit_y1"] <= y <= slider["hit_y2"]:
-                        raw_value = slider_value_from_x(x, slider)
-                        set_slider_raw_value(param_cache, slider["key"], raw_value)
-                        ui_state["active_slider"] = slider["key"]
-                        return
-
-            elif event == cv2.EVENT_MOUSEMOVE and ui_state["active_slider"] is not None:
-                for slider in ui_state["slider_layout"]:
-                    if slider["key"] == ui_state["active_slider"]:
-                        raw_value = slider_value_from_x(x, slider)
-                        set_slider_raw_value(param_cache, slider["key"], raw_value)
-                        break
-
-            elif event == cv2.EVENT_LBUTTONUP:
-                ui_state["active_slider"] = None
+    def _apply_profile(self, profile_name: str) -> None:
+        profile = self.profiles.get(profile_name)
+        if not profile:
             return
 
-        y_img = y - panel_h
-        if x >= img_w or y_img < 0 or y_img >= img_h:
-            return
+        mapping = {
+            "Modo 0B-1H-2X": "mode",
+            "Blur": "blur",
+            "Canny Low": "canny_low",
+            "Canny High": "canny_high",
+            "Kernel": "kernel",
+            "H min": "h_min",
+            "S min": "s_min",
+            "V min": "v_min",
+            "H max": "h_max",
+            "S max": "s_max",
+            "V max": "v_max",
+            "H2 min": "h2_min",
+            "S2 min": "s2_min",
+            "V2 min": "v2_min",
+            "H2 max": "h2_max",
+            "S2 max": "s2_max",
+            "V2 max": "v2_max",
+            "Min W": "min_w",
+            "Min H": "min_h",
+            "Max W %": "max_w_pct",
+            "Max H %": "max_h_pct",
+            "Base %": "base_pct",
+            "Margen X %": "margin_x_pct",
+        }
 
-        bx1, by1, bx2, by2 = button_rect
+        for slider_name, key in mapping.items():
+            if key in profile:
+                cv2.setTrackbarPos(slider_name, WINDOW_CTRL, int(profile[key]))
+
+    def _read_sliders(self) -> Dict[str, int]:
+        d = {
+            "mode": cv2.getTrackbarPos("Modo 0B-1H-2X", WINDOW_CTRL),
+            "blur": odd_value(cv2.getTrackbarPos("Blur", WINDOW_CTRL), 1),
+            "canny_low": cv2.getTrackbarPos("Canny Low", WINDOW_CTRL),
+            "canny_high": cv2.getTrackbarPos("Canny High", WINDOW_CTRL),
+            "kernel": odd_value(cv2.getTrackbarPos("Kernel", WINDOW_CTRL), 1),
+            "h_min": cv2.getTrackbarPos("H min", WINDOW_CTRL),
+            "s_min": cv2.getTrackbarPos("S min", WINDOW_CTRL),
+            "v_min": cv2.getTrackbarPos("V min", WINDOW_CTRL),
+            "h_max": cv2.getTrackbarPos("H max", WINDOW_CTRL),
+            "s_max": cv2.getTrackbarPos("S max", WINDOW_CTRL),
+            "v_max": cv2.getTrackbarPos("V max", WINDOW_CTRL),
+            "h2_min": cv2.getTrackbarPos("H2 min", WINDOW_CTRL),
+            "s2_min": cv2.getTrackbarPos("S2 min", WINDOW_CTRL),
+            "v2_min": cv2.getTrackbarPos("V2 min", WINDOW_CTRL),
+            "h2_max": cv2.getTrackbarPos("H2 max", WINDOW_CTRL),
+            "s2_max": cv2.getTrackbarPos("S2 max", WINDOW_CTRL),
+            "v2_max": cv2.getTrackbarPos("V2 max", WINDOW_CTRL),
+            "min_w": cv2.getTrackbarPos("Min W", WINDOW_CTRL),
+            "min_h": cv2.getTrackbarPos("Min H", WINDOW_CTRL),
+            "max_w_pct": max(1, cv2.getTrackbarPos("Max W %", WINDOW_CTRL)),
+            "max_h_pct": max(1, cv2.getTrackbarPos("Max H %", WINDOW_CTRL)),
+            "base_pct": max(1, cv2.getTrackbarPos("Base %", WINDOW_CTRL)),
+            "margin_x_pct": min(49, cv2.getTrackbarPos("Margen X %", WINDOW_CTRL)),
+        }
+
+        cv2.setTrackbarPos("Blur", WINDOW_CTRL, d["blur"])
+        cv2.setTrackbarPos("Kernel", WINDOW_CTRL, d["kernel"])
+
+        return d
+
+    def _snapshot_undo(self) -> None:
+        self.undo_stack.append(copy.deepcopy(self.manual_rects))
+        if len(self.undo_stack) > 50:
+            self.undo_stack.pop(0)
+
+    def _undo(self) -> None:
+        if not self.undo_stack:
+            return
+        self.manual_rects = self.undo_stack.pop()
+        if self.manual_rects:
+            self.selected_idx = min(self.selected_idx, len(self.manual_rects) - 1)
+        else:
+            self.selected_idx = -1
+
+    def _point_inside_rect(self, x: int, y: int, r: Rect) -> bool:
+        return r.x <= x <= (r.x + r.w) and r.y <= y <= (r.y + r.h)
+
+    def _point_on_resize_handle(self, x: int, y: int, r: Rect) -> bool:
+        handle = 12
+        return abs(x - (r.x + r.w)) <= handle and abs(y - (r.y + r.h)) <= handle
+
+    def _select_at(self, x: int, y: int) -> int:
+        for i in range(len(self.manual_rects) - 1, -1, -1):
+            if self._point_inside_rect(x, y, self.manual_rects[i]):
+                return i
+        return -1
+
+    def _delete_at(self, x: int, y: int) -> None:
+        idx = self._select_at(x, y)
+        if idx < 0:
+            return
+        self._snapshot_undo()
+        self.manual_rects.pop(idx)
+        if not self.manual_rects:
+            self.selected_idx = -1
+        else:
+            self.selected_idx = min(idx, len(self.manual_rects) - 1)
+
+    def _normalize_rect(self, x1: int, y1: int, x2: int, y2: int) -> Rect:
+        xx1 = min(x1, x2)
+        yy1 = min(y1, y2)
+        xx2 = max(x1, x2)
+        yy2 = max(y1, y2)
+        w = max(1, xx2 - xx1)
+        h = max(1, yy2 - yy1)
+        return Rect(xx1, yy1, w, h, self.current_type, "manual")
+
+    def on_mouse(self, event: int, x: int, y: int, _flags: int, _param: object) -> None:
+        x = int(np.clip(x, 0, self.image_w - 1))
+        y = int(np.clip(y, 0, self.image_h - 1))
+
+        if event == cv2.EVENT_RBUTTONDOWN:
+            self._delete_at(x, y)
+            return
 
         if event == cv2.EVENT_LBUTTONDOWN:
-            if bx1 <= x <= bx2 and by1 <= y_img <= by2:
-                ui_state["save_requested"] = True
+            idx = self._select_at(x, y)
+            if idx >= 0 and self._point_on_resize_handle(x, y, self.manual_rects[idx]):
+                self.selected_idx = idx
+                self.drag_mode = "resize"
+                r = self.manual_rects[idx]
+                self.resize_origin = (r.x, r.y, r.w, r.h)
+                self.drag_start = (x, y)
                 return
 
-            selected = find_rect_at_point(ui_state["manual_rects"], x, y_img)
-            if selected != -1:
-                ui_state["selected_idx"] = selected
-                rect = ui_state["manual_rects"][selected]
-                handle = ui_state["resize_handle_size"]
-                hx1 = rect["x"] + rect["width"] - handle
-                hy1 = rect["y"] + rect["height"] - handle
-                if hx1 <= x <= rect["x"] + rect["width"] and hy1 <= y_img <= rect["y"] + rect["height"]:
-                    ui_state["interaction"] = "resizing"
-                else:
-                    ui_state["interaction"] = "moving"
-                    ui_state["move_offset"] = (x - rect["x"], y_img - rect["y"])
-                ui_state["current"] = clamp_point(x, y_img)
-                return
-
-            selected_auto = find_rect_at_point(ui_state["last_auto_rects"], x, y_img)
-            if selected_auto != -1:
-                auto_rect = ui_state["last_auto_rects"][selected_auto]
-                ui_state["manual_rects"].append(
-                    {
-                        "x": int(auto_rect["x"]),
-                        "y": int(auto_rect["y"]),
-                        "width": int(auto_rect["width"]),
-                        "height": int(auto_rect["height"]),
-                        "type": auto_rect.get("type", "solido"),
-                        "source": "auto_edit",
-                    }
-                )
-                ui_state["selected_idx"] = len(ui_state["manual_rects"]) - 1
-                rect = ui_state["manual_rects"][ui_state["selected_idx"]]
-                handle = ui_state["resize_handle_size"]
-                hx1 = rect["x"] + rect["width"] - handle
-                hy1 = rect["y"] + rect["height"] - handle
-                if hx1 <= x <= rect["x"] + rect["width"] and hy1 <= y_img <= rect["y"] + rect["height"]:
-                    ui_state["interaction"] = "resizing"
-                else:
-                    ui_state["interaction"] = "moving"
-                    ui_state["move_offset"] = (x - rect["x"], y_img - rect["y"])
-                ui_state["current"] = clamp_point(x, y_img)
-                return
-
-            ui_state["selected_idx"] = -1
-            ui_state["interaction"] = "drawing"
-            ui_state["start"] = clamp_point(x, y_img)
-            ui_state["current"] = clamp_point(x, y_img)
+            self.drag_mode = "create"
+            self.drag_start = (x, y)
+            self.temp_rect = Rect(x, y, 1, 1, self.current_type, "manual")
+            sel = self._select_at(x, y)
+            if sel >= 0:
+                self.selected_idx = sel
 
         elif event == cv2.EVENT_MOUSEMOVE:
-            if ui_state["interaction"] == "drawing":
-                ui_state["current"] = clamp_point(x, y_img)
-            elif ui_state["interaction"] == "moving" and ui_state["selected_idx"] != -1:
-                nx = x - ui_state["move_offset"][0]
-                ny = y_img - ui_state["move_offset"][1]
-                r = ui_state["manual_rects"][ui_state["selected_idx"]]
-                r["x"] = nx
-                r["y"] = ny
-                normalize_manual_rect(r)
-                ui_state["current"] = clamp_point(x, y_img)
-            elif ui_state["interaction"] == "resizing" and ui_state["selected_idx"] != -1:
-                r = ui_state["manual_rects"][ui_state["selected_idx"]]
-                cx, cy = clamp_point(x, y_img)
-                r["width"] = max(1, cx - r["x"])
-                r["height"] = max(1, cy - r["y"])
-                normalize_manual_rect(r)
-                ui_state["current"] = (cx, cy)
+            if self.drag_mode == "create" and self.drag_start is not None:
+                self.temp_rect = self._normalize_rect(self.drag_start[0], self.drag_start[1], x, y)
+            elif (
+                self.drag_mode == "resize"
+                and self.drag_start is not None
+                and self.resize_origin is not None
+                and self.selected_idx >= 0
+                and self.selected_idx < len(self.manual_rects)
+            ):
+                ox, oy, ow, oh = self.resize_origin
+                nw = max(1, ow + (x - self.drag_start[0]))
+                nh = max(1, oh + (y - self.drag_start[1]))
+                self.manual_rects[self.selected_idx] = Rect(ox, oy, nw, nh, self.manual_rects[self.selected_idx].tipo, "manual")
 
         elif event == cv2.EVENT_LBUTTONUP:
-            ui_state["active_slider"] = None
-            if ui_state["interaction"] == "drawing":
-                ui_state["current"] = clamp_point(x, y_img)
-                x1 = min(ui_state["start"][0], ui_state["current"][0])
-                y1 = min(ui_state["start"][1], ui_state["current"][1])
-                x2 = max(ui_state["start"][0], ui_state["current"][0])
-                y2 = max(ui_state["start"][1], ui_state["current"][1])
+            if self.drag_mode == "create" and self.temp_rect is not None:
+                self._snapshot_undo()
+                self.temp_rect.clamp_positive()
+                self.manual_rects.append(self.temp_rect)
+                self.selected_idx = len(self.manual_rects) - 1
+                self.temp_rect = None
+            elif self.drag_mode == "resize":
+                if self.selected_idx >= 0 and self.selected_idx < len(self.manual_rects):
+                    self.manual_rects[self.selected_idx].clamp_positive()
+            self.drag_mode = None
+            self.drag_start = None
+            self.resize_origin = None
 
-                w = x2 - x1
-                h = y2 - y1
+    def _build_masks(self, sliders: Dict[str, int]) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+        blur = sliders["blur"]
+        kernel_size = sliders["kernel"]
+        mode = sliders["mode"]
 
-                if w >= 5 and h >= 5:
-                    ui_state["manual_rects"].append(
-                        {
-                            "x": int(x1),
-                            "y": int(y1),
-                            "width": int(w),
-                            "height": int(h),
-                            "type": ui_state["manual_type"],
-                            "source": "manual",
-                        }
-                    )
-                    ui_state["selected_idx"] = len(ui_state["manual_rects"]) - 1
-            elif ui_state["interaction"] in ("moving", "resizing") and ui_state["selected_idx"] != -1:
-                normalize_manual_rect(ui_state["manual_rects"][ui_state["selected_idx"]])
+        hsv = cv2.cvtColor(self.image_original, cv2.COLOR_BGR2HSV)
+        blur_img = cv2.GaussianBlur(self.image_original, (blur, blur), 0)
+        gray = cv2.cvtColor(blur_img, cv2.COLOR_BGR2GRAY)
 
-            ui_state["interaction"] = "none"
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
 
-        elif event == cv2.EVENT_RBUTTONDOWN:
-            selected = find_rect_at_point(ui_state["manual_rects"], x, y_img)
-            if selected != -1:
-                del ui_state["manual_rects"][selected]
-                if ui_state["selected_idx"] == selected:
-                    ui_state["selected_idx"] = -1
-                elif ui_state["selected_idx"] > selected:
-                    ui_state["selected_idx"] -= 1
-                return
+        edges = cv2.Canny(gray, sliders["canny_low"], sliders["canny_high"])
+        mask_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+        mask_edges = cv2.dilate(mask_edges, kernel, iterations=1)
 
-            selected_auto = find_rect_at_point(ui_state["last_auto_rects"], x, y_img)
-            if selected_auto != -1:
-                auto_rect = dict(ui_state["last_auto_rects"][selected_auto])
-                auto_rect["source"] = "auto_exclusion"
-                ui_state["excluded_auto_rects"].append(auto_rect)
-                print(
-                    f"Auto excluido: {auto_rect.get('type', 'solido')} "
-                    f"x:{auto_rect['x']} y:{auto_rect['y']} "
-                    f"w:{auto_rect['width']} h:{auto_rect['height']}"
-                )
+        lower1 = np.array([sliders["h_min"], sliders["s_min"], sliders["v_min"]], dtype=np.uint8)
+        upper1 = np.array([sliders["h_max"], sliders["s_max"], sliders["v_max"]], dtype=np.uint8)
+        lower2 = np.array([sliders["h2_min"], sliders["s2_min"], sliders["v2_min"]], dtype=np.uint8)
+        upper2 = np.array([sliders["h2_max"], sliders["s2_max"], sliders["v2_max"]], dtype=np.uint8)
 
-    cv2.setMouseCallback(WINDOW_NAME, on_mouse)
-    
-    # Toggles de visibilidad por tipo
-    tipos_visibles = {
-        "solido": True,
-        "agua": True,
-        "tejado": True,
-        "vegetacion": True,
-    }
+        mask_hsv_1 = cv2.inRange(hsv, lower1, upper1)
+        mask_hsv_2 = cv2.inRange(hsv, lower2, upper2)
 
-    # Tipos habilitados para fusion de rectangulos manuales.
-    merge_types_enabled = {
-        "solido": True,
-        "agua": True,
-        "tejado": True,
-        "vegetacion": True,
-    }
+        mask_hsv_1 = cv2.morphologyEx(mask_hsv_1, cv2.MORPH_OPEN, kernel)
+        mask_hsv_1 = cv2.morphologyEx(mask_hsv_1, cv2.MORPH_CLOSE, kernel)
 
-    if perfil_activo in perfiles:
-        aplicar_perfil_trackbars(perfiles[perfil_activo], param_cache)
-        hybrid_hsv_ranges = deepcopy(perfiles[perfil_activo].get("hybrid_hsv_ranges", HYBRID_HSV_RANGES))
+        mask_hsv_2 = cv2.morphologyEx(mask_hsv_2, cv2.MORPH_OPEN, kernel)
+        mask_hsv_2 = cv2.morphologyEx(mask_hsv_2, cv2.MORPH_CLOSE, kernel)
 
-    set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
+        per_type = {
+            TYPE_SOLIDO: np.zeros_like(mask_edges),
+            TYPE_AGUA: np.zeros_like(mask_edges),
+            TYPE_TEJADO: np.zeros_like(mask_edges),
+            TYPE_VEGETACION: np.zeros_like(mask_edges),
+        }
 
-    print("Controles:")
-    print("- Ajusta sliders en tiempo real")
-    print("- Clic izquierdo y arrastrar en imagen para crear rectangulo manual")
-    print("- Clic izquierdo sobre automatico: convertir a editable y ajustar")
-    print("- Clic izquierdo sobre rectangulo manual: seleccionar y mover")
-    print("- Arrastrar esquina inferior derecha del seleccionado: redimensionar")
-    print("- Clic derecho sobre rectangulo manual: borrar")
-    print("- Clic derecho sobre automatico: excluir (borrar automatico)")
-    print("- Teclas n/p seleccionan siguiente/anterior rectangulo manual")
-    print("- Tipos manuales: a=agua, t=tejado, v=vegetacion, o=solido")
-    print("- Boton GUARDAR (en la imagen) o tecla 's' para elegir donde guardar")
-    print("- Tecla 'g' para guardar perfil actual como 'custom'")
-    print("- Teclas 1/2/3/4 para cargar perfil bosque/ciudad/costa/custom")
-    print("- Tecla 'a'/'t'/'v' cambia tipo híbrido activo y carga su HSV en sliders")
-    print("- Mayúsculas A/T/V/O togglean visibilidad agua/tejado/vegetacion/solidos")
-    print("- Tecla 'z' deshace ultimo rectangulo manual, 'c' limpia todos")
-    print("- Tecla 'e' limpia exclusiones de automaticos borrados")
-    print("- Tecla 'h' pliega/despliega sliders")
-    print("- Tecla 'm' fusiona manuales solapados (mismo tipo)")
-    print("- Teclas k/l/b/r: toggle merge de solido/agua/tejado/vegetacion")
-    print("- Presets merge: 5=solo solido, 6=solo agua, 7=todos")
-    print("- Tecla 'q' o ESC para salir")
-    print("  Modo 2 híbrido = HSV (agua/tejado) + bordes (sólidos)")
-
-    ultima_preview = None
-    ultimas_colisiones = []
-    ultimo_modo = "bordes"
-
-    while True:
-        p = leer_parametros(param_cache)
-        param_cache = p
-
-        # En modo híbrido, sliders HSV principales editan el tipo híbrido activo.
-        if p["modo"] == 2:
-            rango_actualizado = read_main_hsv_trackbars(tipo_hibrido_activo, param_cache)
-            slot = ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo)
-            slot.update(rango_actualizado)
-
-        if p["modo"] == 0:
-            _, mask = build_mask_edges(
-                img,
-                p["blur"],
-                p["canny_low"],
-                p["canny_high"],
-                p["kernel"],
-            )
-            ultimo_modo = "bordes"
-
-            cajas_visuales, colisiones = extraer_cajas(
-                mask,
-                img.shape,
-                p["min_w"],
-                p["min_h"],
-                p["max_w_pct"],
-                p["max_h_pct"],
-                p["base_ratio"],
-                p["x_margin_ratio"],
-                obstacle_type="solido",
-            )
-        elif p["modo"] == 1:
-            _, mask = build_mask_hsv(
-                img,
-                p["h_min"],
-                p["h_max"],
-                p["s_min"],
-                p["s_max"],
-                p["v_min"],
-                p["v_max"],
-                p["kernel"],
-            )
-            ultimo_modo = "hsv"
-
-            cajas_visuales, colisiones = extraer_cajas(
-                mask,
-                img.shape,
-                p["min_w"],
-                p["min_h"],
-                p["max_w_pct"],
-                p["max_h_pct"],
-                p["base_ratio"],
-                p["x_margin_ratio"],
-                obstacle_type="hsv_objeto",
-            )
+        if mode == MODE_BORDES:
+            per_type[TYPE_SOLIDO] = mask_edges
+            combined = mask_edges
+        elif mode == MODE_HSV:
+            per_type[TYPE_AGUA] = mask_hsv_1
+            per_type[TYPE_VEGETACION] = mask_hsv_2
+            combined = cv2.bitwise_or(mask_hsv_1, mask_hsv_2)
         else:
-            ultimo_modo = "hibrido"
+            per_type[TYPE_SOLIDO] = mask_edges
+            per_type[TYPE_AGUA] = mask_hsv_1
+            # Split second HSV range by brightness to separate vegetation and roof-like regions.
+            v_channel = hsv[:, :, 2]
+            vmid = int((sliders["v2_min"] + sliders["v2_max"]) / 2)
+            mask_veg = cv2.bitwise_and(mask_hsv_2, cv2.inRange(v_channel, sliders["v2_min"], vmid))
+            mask_roof = cv2.bitwise_and(mask_hsv_2, cv2.inRange(v_channel, vmid + 1, sliders["v2_max"]))
+            per_type[TYPE_VEGETACION] = mask_veg
+            per_type[TYPE_TEJADO] = mask_roof
+            combined = cv2.bitwise_or(mask_edges, mask_hsv_1)
+            combined = cv2.bitwise_or(combined, mask_hsv_2)
 
-            _, mask_edges = build_mask_edges(
-                img,
-                p["blur"],
-                p["canny_low"],
-                p["canny_high"],
-                p["kernel"],
-            )
+        combined = cv2.threshold(combined, 1, 255, cv2.THRESH_BINARY)[1]
+        return combined, per_type
 
-            cajas_visuales, colisiones = extraer_cajas(
-                mask_edges,
-                img.shape,
-                p["min_w"],
-                p["min_h"],
-                p["max_w_pct"],
-                p["max_h_pct"],
-                p["base_ratio"],
-                p["x_margin_ratio"],
-                obstacle_type="solido",
-            )
+    def _contours_to_rects(self, per_type_masks: Dict[str, np.ndarray], sliders: Dict[str, int]) -> List[Rect]:
+        min_w = max(1, sliders["min_w"])
+        min_h = max(1, sliders["min_h"])
+        max_w = int(self.image_w * (sliders["max_w_pct"] / 100.0))
+        max_h = int(self.image_h * (sliders["max_h_pct"] / 100.0))
 
-            mask_hsv_total = np.zeros(mask_edges.shape, dtype=np.uint8)
+        base_factor = sliders["base_pct"] / 100.0
+        margin_factor = sliders["margin_x_pct"] / 100.0
 
-            for rango in hybrid_hsv_ranges:
-                _, mask_tipo = build_mask_hsv(
-                    img,
-                    rango["h_min"],
-                    rango["h_max"],
-                    rango["s_min"],
-                    rango["s_max"],
-                    rango["v_min"],
-                    rango["v_max"],
-                    p["kernel"],
-                )
-                mask_hsv_total = cv2.bitwise_or(mask_hsv_total, mask_tipo)
+        rects: List[Rect] = []
 
-                cajas_tipo, cols_tipo = extraer_cajas(
-                    mask_tipo,
-                    img.shape,
-                    p["min_w"],
-                    p["min_h"],
-                    p["max_w_pct"],
-                    p["max_h_pct"],
-                    p["base_ratio"],
-                    p["x_margin_ratio"],
-                    obstacle_type=rango["type"],
-                )
-                cajas_visuales.extend(cajas_tipo)
-                colisiones.extend(cols_tipo)
+        for tipo, mask in per_type_masks.items():
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for cnt in contours:
+                x, y, w, h = cv2.boundingRect(cnt)
+                if w < min_w or h < min_h:
+                    continue
+                if w > max_w or h > max_h:
+                    continue
 
-            colisiones = deduplicar_colisiones(colisiones, iou_threshold=0.55)
-            mask = cv2.bitwise_or(mask_edges, mask_hsv_total)
+                margin_x = int(w * margin_factor)
+                nx = x + margin_x
+                nw = max(1, w - (2 * margin_x))
 
-        # Excluir rectangulos automaticos borrados con clic derecho.
-        colisiones = [
-            c
-            for c in colisiones
-            if not is_rect_excluded(c, ui_state["excluded_auto_rects"], iou_threshold=0.85)
-        ]
-        ui_state["last_auto_rects"] = [dict(c) for c in colisiones]
-        cajas_visuales = [(c["x"], c["y"], c["width"], c["height"]) for c in colisiones]
+                nh = max(1, int(h * base_factor))
+                ny = y + (h - nh)
 
-        manual_rects = list(ui_state["manual_rects"])
+                nx = int(np.clip(nx, 0, self.image_w - 1))
+                ny = int(np.clip(ny, 0, self.image_h - 1))
+                nw = int(min(nw, self.image_w - nx))
+                nh = int(min(nh, self.image_h - ny))
+                if nw <= 0 or nh <= 0:
+                    continue
 
-        manual_cajas = [(m["x"], m["y"], m["width"], m["height"]) for m in manual_rects]
+                rects.append(Rect(nx, ny, nw, nh, tipo, "auto"))
 
-        colisiones_total = list(colisiones) + manual_rects
-        cajas_visuales_total = list(cajas_visuales) + manual_cajas
+        return rects
 
-        # Filtrar colisiones por visibilidad de tipos
-        colisiones_visibles = [c for c in colisiones_total if tipos_visibles.get(c.get("type", "solido"), True)]
-        cajas_visuales_visibles = [
-            cajas_visuales_total[i]
-            for i, c in enumerate(colisiones_total)
-            if tipos_visibles.get(c.get("type", "solido"), True)
-        ]
-        
-        preview = dibujar_resultado(img, cajas_visuales_visibles, colisiones_visibles)
+    def _draw_rects(self, frame: np.ndarray, rects: List[Rect], selected: int = -1, alpha: float = 0.32) -> np.ndarray:
+        colors = {
+            TYPE_SOLIDO: (30, 30, 230),
+            TYPE_AGUA: (230, 100, 30),
+            TYPE_TEJADO: (30, 230, 230),
+            TYPE_VEGETACION: (30, 180, 30),
+        }
 
-        # Dibuja rectangulo temporal mientras se arrastra con el mouse.
-        if ui_state["interaction"] == "drawing":
-            x1 = min(ui_state["start"][0], ui_state["current"][0])
-            y1 = min(ui_state["start"][1], ui_state["current"][1])
-            x2 = max(ui_state["start"][0], ui_state["current"][0])
-            y2 = max(ui_state["start"][1], ui_state["current"][1])
-            color_tmp = color_por_tipo.get(ui_state["manual_type"], (255, 255, 255))
-            cv2.rectangle(preview, (x1, y1), (x2, y2), color_tmp, 2)
+        overlay = frame.copy()
+        for i, r in enumerate(rects):
+            color = colors.get(r.tipo, (200, 200, 200))
+            cv2.rectangle(overlay, (r.x, r.y), (r.x + r.w, r.y + r.h), color, -1)
+            thickness = 2
+            if i == selected:
+                thickness = 3
+                cv2.rectangle(frame, (r.x + r.w - 5, r.y + r.h - 5), (r.x + r.w + 5, r.y + r.h + 5), (255, 255, 255), -1)
+            cv2.rectangle(frame, (r.x, r.y), (r.x + r.w, r.y + r.h), color, thickness)
             cv2.putText(
-                preview,
-                f"Manual: {ui_state['manual_type']}",
-                (x1, max(15, y1 - 6)),
+                frame,
+                r.tipo[0].upper(),
+                (r.x + 2, max(12, r.y + 12)),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color_tmp,
-                1,
-                cv2.LINE_AA,
-            )
-
-        if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-            s = ui_state["manual_rects"][ui_state["selected_idx"]]
-            sx, sy, sw, sh = s["x"], s["y"], s["width"], s["height"]
-            cv2.rectangle(preview, (sx, sy), (sx + sw, sy + sh), (255, 255, 255), 1)
-            handle = ui_state["resize_handle_size"]
-            cv2.rectangle(
-                preview,
-                (sx + sw - handle, sy + sh - handle),
-                (sx + sw, sy + sh),
+                0.4,
                 (255, 255, 255),
-                -1,
-            )
-
-        # Panel simple con lista de rectangulos manuales.
-        panel_x = 10
-        panel_y = max(95, img_h - 165)
-        panel_w = min(480, img_w - 20)
-        panel_h = min(155, img_h - panel_y - 10)
-        if panel_h > 30:
-            cv2.rectangle(preview, (panel_x, panel_y), (panel_x + panel_w, panel_y + panel_h), (20, 20, 20), -1)
-            cv2.rectangle(preview, (panel_x, panel_y), (panel_x + panel_w, panel_y + panel_h), (70, 70, 70), 1)
-            cv2.putText(
-                preview,
-                "Rectangulos manuales (n/p seleccionar):",
-                (panel_x + 8, panel_y + 18),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
-                (220, 220, 220),
                 1,
                 cv2.LINE_AA,
             )
-            start = max(0, len(ui_state["manual_rects"]) - 6)
-            for row, idx in enumerate(range(start, len(ui_state["manual_rects"]))):
-                r = ui_state["manual_rects"][idx]
-                marker = ">" if idx == ui_state["selected_idx"] else " "
-                line = f"{marker}#{idx} {r['type']} x:{r['x']} y:{r['y']} w:{r['width']} h:{r['height']}"
-                cv2.putText(
-                    preview,
-                    line,
-                    (panel_x + 8, panel_y + 38 + row * 18),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.43,
-                    (230, 230, 230),
-                    1,
-                    cv2.LINE_AA,
-                )
 
-        # Boton de guardado clicable.
-        bx1, by1, bx2, by2 = button_rect
-        cv2.rectangle(preview, (bx1, by1), (bx2, by2), (40, 120, 40), -1)
-        cv2.rectangle(preview, (bx1, by1), (bx2, by2), (230, 230, 230), 1)
-        cv2.putText(
-            preview,
-            "GUARDAR",
-            (bx1 + 24, by1 + 26),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA,
-        )
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+        return frame
 
-        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    def _merge_manual_rects(self) -> None:
+        if not self.manual_rects:
+            return
 
-        vista = np.hstack((preview, mask_bgr))
-        cv2.putText(
-            vista,
-            f"Modo: {ultimo_modo} | Perfil: {perfil_activo} | Colisiones: {len(colisiones_visibles)} | Manuales: {len(manual_rects)}",
-            (10, 25),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 255),
-            2,
-            cv2.LINE_AA,
-        )
-        cv2.putText(
-            vista,
-            f"Tipo HSV activo: {tipo_hibrido_activo} | Tipo manual: {ui_state['manual_type']} (a/t/v/o) | X borra seleccionado",
-            (10, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            1,
-            cv2.LINE_AA,
-        )
-        
-        estado_visibles = " | ".join([f"{t}:{('ON' if tipos_visibles[t] else 'OFF')}" for t in ["solido", "agua", "tejado", "vegetacion"]])
-        cv2.putText(
-            vista,
-            f"Visibilidad: {estado_visibles} (A/T/V/O toggle)",
-            (10, 75),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (200, 200, 200),
-            1,
-            cv2.LINE_AA,
-        )
-        estado_merge = " | ".join(
-            [f"{t}:{('ON' if merge_types_enabled[t] else 'OFF')}" for t in ["solido", "agua", "tejado", "vegetacion"]]
-        )
-        cv2.putText(
-            vista,
-            f"Merge tipos: {estado_merge} (k/l/b/r)",
-            (10, 95),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (200, 200, 200),
-            1,
-            cv2.LINE_AA,
-        )
-        cv2.putText(
-            vista,
-            f"Sliders: {'OCULTOS' if not ui_state['show_sliders'] else ('BASICOS' if not ui_state['show_advanced'] else 'BASICOS+AVANZADOS')} (h)",
-            (10, 115),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (200, 200, 200),
-            1,
-            cv2.LINE_AA,
-        )
+        self._snapshot_undo()
 
-        if ui_state["show_sliders"]:
-            panel_controles, panel_h, toggle_rect, slider_layout = draw_slider_panel(
-                vista.shape[1],
-                param_cache,
-                ui_state["show_advanced"],
-            )
-            ui_state["panel_height"] = panel_h
-            ui_state["toggle_rect"] = toggle_rect
-            ui_state["slider_layout"] = slider_layout
+        changed = True
+        while changed:
+            changed = False
+            merged: List[Rect] = []
+            used = [False] * len(self.manual_rects)
 
-            if panel_h != ui_state["last_panel_height"]:
-                ajustar_tamano_ventana(img_w, img_h, panel_h)
-                ui_state["last_panel_height"] = panel_h
+            for i in range(len(self.manual_rects)):
+                if used[i]:
+                    continue
+                current = self.manual_rects[i]
+                used[i] = True
 
-            frame = np.vstack((panel_controles, vista))
-            cv2.imshow(WINDOW_NAME, frame)
+                for j in range(i + 1, len(self.manual_rects)):
+                    if used[j]:
+                        continue
+                    other = self.manual_rects[j]
+                    if other.tipo != current.tipo:
+                        continue
+                    inter = rect_intersection_area(current, other)
+                    iou = rect_iou(current, other)
+                    if inter > 0 or iou > 0.01:
+                        current = merge_two_rects(current, other)
+                        used[j] = True
+                        changed = True
+
+                merged.append(current)
+
+            self.manual_rects = merged
+
+        if not self.manual_rects:
+            self.selected_idx = -1
         else:
-            ui_state["panel_height"] = 0
-            cv2.imshow(WINDOW_NAME, vista)
+            self.selected_idx = min(self.selected_idx, len(self.manual_rects) - 1)
 
-        ultima_preview = preview
-        ultimas_colisiones = colisiones_total
+    def _current_profile_from_sliders(self) -> Dict[str, int]:
+        return self._read_sliders()
 
-        key = cv2.waitKey(30) & 0xFF
-        if key == ord("s") or ui_state["save_requested"]:
-            prefijo = f"rpg_{ultimo_modo}"
-            before = len(ui_state["manual_rects"])
-            enabled_merge_types = [t for t, enabled in merge_types_enabled.items() if enabled]
-            ui_state["manual_rects"] = merge_manual_rectangles(
-                ui_state["manual_rects"],
-                iou_threshold=0.2,
-                enabled_types=enabled_merge_types,
-            )
-            after = len(ui_state["manual_rects"])
-            if after < before:
-                print(
-                    f"Manuales fusionados al guardar: {before} -> {after} "
-                    f"(tipos: {', '.join(enabled_merge_types) if enabled_merge_types else 'ninguno'})"
+    def _export(self, preview_frame: np.ndarray, all_rects: List[Rect]) -> None:
+        root = tk.Tk()
+        root.withdraw()
+        root.update()
+
+        preview_path = filedialog.asksaveasfilename(
+            title="Guardar preview PNG",
+            defaultextension=".png",
+            filetypes=[("PNG", "*.png")],
+        )
+        if preview_path:
+            cv2.imwrite(preview_path, preview_frame)
+
+        json_path = filedialog.asksaveasfilename(
+            title="Guardar colisiones JSON",
+            defaultextension=".json",
+            filetypes=[("JSON", "*.json")],
+        )
+        if json_path:
+            payload = {
+                "colisiones": [r.to_dict() for r in all_rects],
+                "por_tipo": {tipo: [] for tipo in COLLISION_TYPES},
+            }
+            for r in all_rects:
+                payload["por_tipo"][r.tipo].append(
+                    {
+                        "x": r.x,
+                        "y": r.y,
+                        "w": r.w,
+                        "h": r.h,
+                        "fuente": r.fuente,
+                    }
                 )
-            if ui_state["selected_idx"] >= after:
-                ui_state["selected_idx"] = after - 1
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, ensure_ascii=False)
 
-            # Recompone salidas tras fusion para exportar datos limpios.
-            manual_rects_export = list(ui_state["manual_rects"])
-            ultimas_colisiones = list(colisiones) + manual_rects_export
-            ultima_preview = dibujar_resultado(
-                img,
-                list(cajas_visuales) + [(m["x"], m["y"], m["width"], m["height"]) for m in manual_rects_export],
-                [c for c in ultimas_colisiones if tipos_visibles.get(c.get("type", "solido"), True)],
-            )
+        root.destroy()
 
-            img_path, json_path = seleccionar_rutas_guardado(ruta_imagen, prefijo=prefijo)
-            if img_path and json_path:
-                guardar_salida(
-                    ultima_preview,
-                    ultimas_colisiones,
-                    prefijo=prefijo,
-                    imagen_salida=img_path,
-                    json_salida=json_path,
+    def run(self) -> None:
+        help_text = (
+            "1 Bosque | 2 Ciudad | 3 Costa | 4 Custom | G guardar Custom | "
+            "O/A/T/V tipo | N/P sel | X borrar sel | C limpiar | Z undo | "
+            "M merge | S exportar | Q/ESC salir"
+        )
+
+        while True:
+            sliders = self._read_sliders()
+            combined_mask, per_type_masks = self._build_masks(sliders)
+            self.auto_rects = self._contours_to_rects(per_type_masks, sliders)
+
+            frame = self.image_original.copy()
+            frame = self._draw_rects(frame, self.auto_rects, -1, alpha=0.2)
+            frame = self._draw_rects(frame, self.manual_rects, self.selected_idx, alpha=0.3)
+
+            if self.temp_rect is not None:
+                cv2.rectangle(
+                    frame,
+                    (self.temp_rect.x, self.temp_rect.y),
+                    (self.temp_rect.x + self.temp_rect.w, self.temp_rect.y + self.temp_rect.h),
+                    (255, 255, 255),
+                    1,
                 )
-            ui_state["save_requested"] = False
-        elif key == ord("A"):
-            tipos_visibles["agua"] = not tipos_visibles["agua"]
-            print(f"Agua: {'ON' if tipos_visibles['agua'] else 'OFF'}")
-        elif key == ord("T"):
-            tipos_visibles["tejado"] = not tipos_visibles["tejado"]
-            print(f"Tejado: {'ON' if tipos_visibles['tejado'] else 'OFF'}")
-        elif key == ord("V"):
-            tipos_visibles["vegetacion"] = not tipos_visibles["vegetacion"]
-            print(f"Vegetacion: {'ON' if tipos_visibles['vegetacion'] else 'OFF'}")
-        elif key == ord("O"):
-            tipos_visibles["solido"] = not tipos_visibles["solido"]
-            print(f"Solido: {'ON' if tipos_visibles['solido'] else 'OFF'}")
-        elif key == ord("g"):
-            perfil_custom = perfil_desde_parametros(p, hybrid_hsv_ranges)
-            perfiles["custom"] = sanitize_profile(perfil_custom)
-            guardar_perfiles(ruta_perfiles, perfiles)
-            perfil_activo = "custom"
-            print(f"Perfil guardado en: {ruta_perfiles} (custom)")
-        elif key == ord("a"):
-            tipo_hibrido_activo = "agua"
-            ui_state["manual_type"] = "agua"
-            if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-                ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "agua"
-            set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
-            print("Tipo híbrido activo: agua")
-        elif key == ord("t"):
-            tipo_hibrido_activo = "tejado"
-            ui_state["manual_type"] = "tejado"
-            if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-                ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "tejado"
-            set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
-            print("Tipo híbrido activo: tejado")
-        elif key == ord("v"):
-            tipo_hibrido_activo = "vegetacion"
-            ui_state["manual_type"] = "vegetacion"
-            if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-                ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "vegetacion"
-            set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
-            print("Tipo híbrido activo: vegetacion")
-        elif key == ord("o"):
-            ui_state["manual_type"] = "solido"
-            if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-                ui_state["manual_rects"][ui_state["selected_idx"]]["type"] = "solido"
-            print("Tipo manual activo: solido")
-        elif key == ord("m"):
-            before = len(ui_state["manual_rects"])
-            enabled_merge_types = [t for t, enabled in merge_types_enabled.items() if enabled]
-            ui_state["manual_rects"] = merge_manual_rectangles(
-                ui_state["manual_rects"],
-                iou_threshold=0.2,
-                enabled_types=enabled_merge_types,
-            )
-            after = len(ui_state["manual_rects"])
-            if ui_state["selected_idx"] >= after:
-                ui_state["selected_idx"] = after - 1
-            print(
-                f"Fusion manual aplicada: {before} -> {after} "
-                f"(tipos: {', '.join(enabled_merge_types) if enabled_merge_types else 'ninguno'})"
-            )
-        elif key == ord("k"):
-            merge_types_enabled["solido"] = not merge_types_enabled["solido"]
-            print(f"Merge solido: {'ON' if merge_types_enabled['solido'] else 'OFF'}")
-        elif key == ord("l"):
-            merge_types_enabled["agua"] = not merge_types_enabled["agua"]
-            print(f"Merge agua: {'ON' if merge_types_enabled['agua'] else 'OFF'}")
-        elif key == ord("b"):
-            merge_types_enabled["tejado"] = not merge_types_enabled["tejado"]
-            print(f"Merge tejado: {'ON' if merge_types_enabled['tejado'] else 'OFF'}")
-        elif key == ord("r"):
-            merge_types_enabled["vegetacion"] = not merge_types_enabled["vegetacion"]
-            print(f"Merge vegetacion: {'ON' if merge_types_enabled['vegetacion'] else 'OFF'}")
-        elif key == ord("5"):
-            merge_types_enabled["solido"] = True
-            merge_types_enabled["agua"] = False
-            merge_types_enabled["tejado"] = False
-            merge_types_enabled["vegetacion"] = False
-            print("Preset merge aplicado: solo solido")
-        elif key == ord("6"):
-            merge_types_enabled["solido"] = False
-            merge_types_enabled["agua"] = True
-            merge_types_enabled["tejado"] = False
-            merge_types_enabled["vegetacion"] = False
-            print("Preset merge aplicado: solo agua")
-        elif key == ord("7"):
-            merge_types_enabled["solido"] = True
-            merge_types_enabled["agua"] = True
-            merge_types_enabled["tejado"] = True
-            merge_types_enabled["vegetacion"] = True
-            print("Preset merge aplicado: todos")
-        elif key == ord("z"):
-            if ui_state["manual_rects"]:
-                ui_state["manual_rects"].pop()
-                if ui_state["selected_idx"] >= len(ui_state["manual_rects"]):
-                    ui_state["selected_idx"] = len(ui_state["manual_rects"]) - 1
-                print("Se deshizo el ultimo rectangulo manual.")
-        elif key == ord("n"):
-            if ui_state["manual_rects"]:
-                if ui_state["selected_idx"] == -1:
-                    ui_state["selected_idx"] = 0
-                else:
-                    ui_state["selected_idx"] = (ui_state["selected_idx"] + 1) % len(ui_state["manual_rects"])
-                print(f"Rectangulo seleccionado: #{ui_state['selected_idx']}")
-        elif key == ord("p"):
-            if ui_state["manual_rects"]:
-                if ui_state["selected_idx"] == -1:
-                    ui_state["selected_idx"] = len(ui_state["manual_rects"]) - 1
-                else:
-                    ui_state["selected_idx"] = (ui_state["selected_idx"] - 1) % len(ui_state["manual_rects"])
-                print(f"Rectangulo seleccionado: #{ui_state['selected_idx']}")
-        elif key == ord("x"):
-            if 0 <= ui_state["selected_idx"] < len(ui_state["manual_rects"]):
-                del ui_state["manual_rects"][ui_state["selected_idx"]]
-                ui_state["selected_idx"] = -1
-                print("Se borro el rectangulo manual seleccionado.")
-        elif key == ord("c"):
-            ui_state["manual_rects"].clear()
-            ui_state["selected_idx"] = -1
-            print("Se limpiaron todos los rectangulos manuales.")
-        elif key == ord("e"):
-            ui_state["excluded_auto_rects"].clear()
-            print("Se limpiaron exclusiones de automaticos.")
-        elif key == ord("h"):
-            ui_state["show_sliders"] = not ui_state["show_sliders"]
-            if ui_state["show_sliders"]:
-                ajustar_tamano_ventana(img_w, img_h, 180)
-            else:
-                ajustar_tamano_ventana(img_w, img_h, 0)
-                ui_state["panel_height"] = 0
-            print(f"Sliders {'visibles' if ui_state['show_sliders'] else 'ocultos'}.")
-        elif key in (ord("1"), ord("2"), ord("3"), ord("4")):
-            idx = int(chr(key)) - 1
-            if 0 <= idx < len(profile_keys):
-                target = profile_keys[idx]
-                if target in perfiles:
-                    aplicar_perfil_trackbars(perfiles[target], param_cache)
-                    hybrid_hsv_ranges = deepcopy(perfiles[target].get("hybrid_hsv_ranges", HYBRID_HSV_RANGES))
-                    if tipo_hibrido_activo not in tipos_hibridos:
-                        tipo_hibrido_activo = "agua"
-                    set_main_hsv_trackbars(ensure_hybrid_type(hybrid_hsv_ranges, tipo_hibrido_activo), param_cache)
-                    perfil_activo = target
-                    print(f"Perfil cargado: {target}")
-                else:
-                    print(f"Perfil no encontrado: {target}")
-        elif key == ord("q") or key == 27:
-            break
 
-    cv2.destroyAllWindows()
+            cv2.putText(frame, f"Tipo actual: {self.current_type}", (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(frame, help_text, (10, self.image_h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+
+            cv2.imshow(WINDOW_MAIN, frame)
+            cv2.imshow(WINDOW_MASK, combined_mask)
+
+            key = cv2.waitKey(16) & 0xFF
+            if key == 255:
+                continue
+
+            if key in (27, ord("q")):
+                break
+
+            elif key == ord("1"):
+                self._apply_profile("Bosque")
+            elif key == ord("2"):
+                self._apply_profile("Ciudad")
+            elif key == ord("3"):
+                self._apply_profile("Costa")
+            elif key == ord("4"):
+                self._apply_profile("Custom")
+            elif key == ord("g"):
+                self.profiles["Custom"] = self._current_profile_from_sliders()
+                save_profiles(self.profiles)
+
+            elif key == ord("o"):
+                self.current_type = TYPE_SOLIDO
+            elif key == ord("a"):
+                self.current_type = TYPE_AGUA
+            elif key == ord("t"):
+                self.current_type = TYPE_TEJADO
+            elif key == ord("v"):
+                self.current_type = TYPE_VEGETACION
+
+            elif key == ord("n"):
+                if self.manual_rects:
+                    self.selected_idx = (self.selected_idx + 1) % len(self.manual_rects)
+            elif key == ord("p"):
+                if self.manual_rects:
+                    self.selected_idx = (self.selected_idx - 1) % len(self.manual_rects)
+            elif key == ord("x"):
+                if 0 <= self.selected_idx < len(self.manual_rects):
+                    self._snapshot_undo()
+                    self.manual_rects.pop(self.selected_idx)
+                    if not self.manual_rects:
+                        self.selected_idx = -1
+                    else:
+                        self.selected_idx = min(self.selected_idx, len(self.manual_rects) - 1)
+            elif key == ord("c"):
+                if self.manual_rects:
+                    self._snapshot_undo()
+                    self.manual_rects = []
+                    self.selected_idx = -1
+            elif key == ord("z"):
+                self._undo()
+            elif key == ord("m"):
+                self._merge_manual_rects()
+            elif key == ord("s"):
+                all_rects = self.auto_rects + self.manual_rects
+                self._export(frame, all_rects)
+
+        cv2.destroyAllWindows()
 
 
-def seleccionar_imagen():
+def ask_image_path() -> Optional[str]:
     root = tk.Tk()
     root.withdraw()
-    root.attributes("-topmost", True)
-
-    ruta_imagen = filedialog.askopenfilename(
-        title="Selecciona una imagen para procesar",
+    root.update()
+    path = filedialog.askopenfilename(
+        title="Selecciona imagen de mapa o tileset",
         filetypes=[
-            ("Imagenes", "*.jpg *.jpeg *.png *.webp *.web"),
-            ("Todos los archivos", "*.*"),
+            ("Imagenes", "*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff;*.webp"),
+            ("Todos", "*.*"),
         ],
     )
-
     root.destroy()
-
-    if not ruta_imagen:
-        print("No se seleccionó ninguna imagen.")
+    if not path:
         return None
+    return path
 
-    ext = os.path.splitext(ruta_imagen)[1].lower()
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        print(
-            "Formato no permitido. Usa una imagen con extension: "
-            "jpg, jpeg, png, webp o web."
-        )
-        return None
 
-    return ruta_imagen
+def main() -> None:
+    image_path = ask_image_path()
+    if not image_path:
+        print("No se selecciono imagen.")
+        return
+
+    image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    if image is None:
+        print("No se pudo cargar la imagen.")
+        return
+
+    app = CollisionExtractorApp(image)
+    app.run()
 
 
 if __name__ == "__main__":
-    ruta_imagen = seleccionar_imagen()
-    if ruta_imagen:
-        extraer_colisiones_rpg_interactivo(ruta_imagen)
+    main()
